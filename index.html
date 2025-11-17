@@ -1351,12 +1351,34 @@
             
             const recordType = document.getElementById('recordType').value;
             const now = new Date();
+            const todayDate = now.toLocaleDateString('es-MX');
             
+            // Verificar si ya existe un registro del mismo tipo para este alumno hoy
+            const existingRecord = attendanceRecords.find(r => 
+                r.studentCode === code && 
+                r.date === todayDate && 
+                r.type === recordType
+            );
+            
+            if (existingRecord) {
+                // Ya existe un registro del mismo tipo hoy
+                const icon = recordType === 'entrada' ? '⚠️' : '⚠️';
+                const typeText = recordType === 'entrada' ? 'ENTRADA' : 'SALIDA';
+                showStatus(
+                    `${icon} ${student.name} ya registró su ${typeText} hoy<br>` +
+                    `<strong>Hora del primer registro: ${existingRecord.time}</strong><br>` +
+                    `No se registrará nuevamente`,
+                    'info'
+                );
+                return;
+            }
+            
+            // No existe registro previo, proceder a registrar
             const record = {
                 studentCode: code,
                 studentName: student.name,
                 type: recordType,
-                date: now.toLocaleDateString('es-MX'),
+                date: todayDate,
                 time: now.toLocaleTimeString('es-MX'),
                 timestamp: now.getTime()
             };
@@ -1385,9 +1407,12 @@
             statusDiv.innerHTML = message;
             statusDiv.style.display = 'block';
             
+            // Tiempo más largo para mensajes de información (duplicados)
+            const timeout = type === 'info' ? 5000 : 3000;
+            
             setTimeout(() => {
                 statusDiv.style.display = 'none';
-            }, 3000);
+            }, timeout);
         }
 
         // ========== IMPORTAR ALUMNOS DESDE CSV ==========
