@@ -1732,6 +1732,7 @@
             
             if (!weekInput) {
                 document.getElementById('weeklyReport').innerHTML = '<p style="text-align: center; color: #999;">Seleccione una semana para ver el reporte</p>';
+                document.getElementById('statsGrid').innerHTML = '';
                 return;
             }
             
@@ -1740,9 +1741,42 @@
             const weekEnd = new Date(weekStart);
             weekEnd.setDate(weekEnd.getDate() + 6);
             
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            
+            // Calcular días hábiles (lunes a viernes) que ya han transcurrido
+            let workDaysInWeek = 0;
+            let workDaysPassed = 0;
+            const workDaysList = [];
+            
+            for (let i = 0; i < 7; i++) {
+                const currentDay = new Date(weekStart);
+                currentDay.setDate(weekStart.getDate() + i);
+                const dayOfWeek = currentDay.getDay();
+                
+                // Solo contar lunes (1) a viernes (5)
+                if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+                    workDaysInWeek++;
+                    workDaysList.push(new Date(currentDay));
+                    
+                    // Contar solo si el día ya ha pasado
+                    if (currentDay <= today) {
+                        workDaysPassed++;
+                    }
+                }
+            }
+            
+            // Filtrar registros solo de días hábiles (lunes a viernes)
             const weekRecords = attendanceRecords.filter(record => {
                 const recordDate = parseDate(record.date);
-                return recordDate >= weekStart && recordDate <= weekEnd;
+                const dayOfWeek = recordDate.getDay();
+                
+                // Verificar que esté en el rango de la semana, sea día hábil y ya haya pasado
+                return recordDate >= weekStart && 
+                       recordDate <= weekEnd && 
+                       dayOfWeek >= 1 && 
+                       dayOfWeek <= 5 &&
+                       recordDate <= today;
             });
             
             const totalRegistros = weekRecords.length;
@@ -1750,7 +1784,20 @@
             const totalSalidas = weekRecords.filter(r => r.type === 'salida').length;
             const alumnosUnicos = new Set(weekRecords.map(r => r.studentCode)).size;
             
-            document.getElementById('statsGrid').innerHTML = `
+            // Información de la semana
+            const weekInfo = workDaysPassed < workDaysInWeek 
+                ? `<p style="background: #fff3e0; padding: 15px; border-radius: 8px; text-align: center; margin: 20px 0; border: 2px solid #ff9800;">
+                     ⚠️ <strong>Semana en curso:</strong> Se han contabilizado ${workDaysPassed} de ${workDaysInWeek} días hábiles (lunes a viernes)
+                   </p>`
+                : `<p style="background: #e8f5e9; padding: 15px; border-radius: 8px; text-align: center; margin: 20px 0; border: 2px solid #4caf50;">
+                     ✅ <strong>Semana completa:</strong> ${workDaysInWeek} días hábiles contabilizados (lunes a viernes)
+                   </p>`;
+            
+            document.getElementById('statsGrid').innerHTML = weekInfo + `
+                <div class="stat-card">
+                    <h3>${workDaysPassed}</h3>
+                    <p>Días Hábiles Transcurridos</p>
+                </div>
                 <div class="stat-card">
                     <h3>${totalRegistros}</h3>
                     <p>Total de Registros</p>
@@ -1769,22 +1816,35 @@
                 </div>
             `;
             
+            // Calcular estadísticas por alumno
             const studentStats = {};
             students.forEach(student => {
                 const studentRecords = weekRecords.filter(r => r.studentCode === student.code);
                 const entradas = studentRecords.filter(r => r.type === 'entrada');
+                
+                // Contar solo los días hábiles únicos que el alumno asistió
                 const diasAsistidos = new Set(entradas.map(r => r.date)).size;
+                const diasAusentes = workDaysPassed - diasAsistidos;
+                const porcentajeAsistencia = workDaysPassed > 0 
+                    ? ((diasAsistidos / workDaysPassed) * 100).toFixed(1) 
+                    : 0;
                 
                 studentStats[student.code] = {
                     name: student.name,
                     diasAsistidos: diasAsistidos,
-                    diasAusentes: 5 - diasAsistidos,
+                    diasAusentes: diasAusentes,
+                    porcentajeAsistencia: porcentajeAsistencia,
                     totalRegistros: studentRecords.length
                 };
             });
             
+            // Ordenar por porcentaje de asistencia (mayor a menor)
+            const sortedStudents = Object.entries(studentStats).sort((a, b) => 
+                parseFloat(b[1].porcentajeAsistencia) - parseFloat(a[1].porcentajeAsistencia)
+            );
+            
             document.getElementById('weeklyReport').innerHTML = `
-                <h3>Reporte Detallado por Alumno</h3>
+                <h3>Reporte Detallado por Alumno (Solo Días Hábiles: Lunes a Viernes)</h3>
                 <table>
                     <thead>
                         <tr>
@@ -1792,21 +1852,37 @@
                             <th>Código</th>
                             <th>Días Asistidos</th>
                             <th>Días Ausentes</th>
+                            <th>% Asistencia</th>
                             <th>Total Registros</th>
                         </tr>
                     </thead>
                     <tbody>
-                        ${Object.entries(studentStats).map(([code, stats]) => `
-                            <tr>
-                                <td>${stats.name}</td>
-                                <td>${code}</td>
-                                <td>${stats.diasAsistidos}</td>
-                                <td>${stats.diasAusentes}</td>
-                                <td>${stats.totalRegistros}</td>
-                            </tr>
-                        `).join('')}
+                        ${sortedStudents.map(([code, stats]) => {
+                            const percentage = parseFloat(stats.porcentajeAsistencia);
+                            let rowColor = '';
+                            if (percentage >= 90) rowColor = 'background: #d4edda;';
+                            else if (percentage >= 70) rowColor = 'background: #fff3cd;';
+                            else if (percentage < 70 && workDaysPassed > 0) rowColor = 'background: #f8d7da;';
+                            
+                            return `
+                                <tr style="${rowColor}">
+                                    <td><strong>${stats.name}</strong></td>
+                                    <td>${code}</td>
+                                    <td>${stats.diasAsistidos} / ${workDaysPassed}</td>
+                                    <td>${stats.diasAusentes}</td>
+                                    <td><strong>${stats.porcentajeAsistencia}%</strong></td>
+                                    <td>${stats.totalRegistros}</td>
+                                </tr>
+                            `;
+                        }).join('')}
                     </tbody>
                 </table>
+                <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                    <h4>Leyenda de Colores:</h4>
+                    <p><span style="display: inline-block; width: 20px; height: 20px; background: #d4edda; border: 1px solid #c3e6cb; vertical-align: middle;"></span> <strong>Verde:</strong> ≥ 90% de asistencia (Excelente)</p>
+                    <p><span style="display: inline-block; width: 20px; height: 20px; background: #fff3cd; border: 1px solid #ffeeba; vertical-align: middle;"></span> <strong>Amarillo:</strong> 70% - 89% de asistencia (Regular)</p>
+                    <p><span style="display: inline-block; width: 20px; height: 20px; background: #f8d7da; border: 1px solid #f5c6cb; vertical-align: middle;"></span> <strong>Rojo:</strong> < 70% de asistencia (Requiere atención)</p>
+                </div>
             `;
         }
 
