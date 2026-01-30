@@ -376,7 +376,6 @@
             margin-bottom: 20px;
         }
 
-        /* NUEVOS ESTILOS PARA LECTOR BLUETOOTH */
         .bluetooth-reader-box {
             background: linear-gradient(135deg, #28a745 0%, #1e7e34 100%);
             padding: 30px;
@@ -542,7 +541,6 @@
             box-shadow: 0 5px 15px rgba(10, 110, 180, 0.3);
         }
 
-        /* MODAL PARA VERIFICACIÓN DE UNIFORME */
         .modal-overlay {
             display: none;
             position: fixed;
@@ -657,7 +655,66 @@
             box-shadow: 0 8px 20px rgba(220, 53, 69, 0.4);
         }
 
-        /* Estilos específicos para móviles */
+        .incident-card {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+            border-left: 5px solid #dc3545;
+        }
+
+        .incident-card.retardo {
+            border-left-color: #ff9800;
+        }
+
+        .incident-card.uniforme {
+            border-left-color: #ffc107;
+        }
+
+        .incident-summary {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            text-align: center;
+        }
+
+        .incident-summary h4 {
+            color: #0A6EB4;
+            margin-bottom: 15px;
+        }
+
+        .incident-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .incident-stat {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            border: 2px solid #e0e0e0;
+        }
+
+        .incident-stat h3 {
+            font-size: 32px;
+            margin-bottom: 5px;
+        }
+
+        .incident-stat.falta h3 {
+            color: #dc3545;
+        }
+
+        .incident-stat.retardo h3 {
+            color: #ff9800;
+        }
+
+        .incident-stat.uniforme h3 {
+            color: #ffc107;
+        }
+
         @media screen and (max-width: 768px) {
             .modal-content {
                 max-width: 95%;
@@ -682,7 +739,6 @@
     </style>
 </head>
 <body>
-    <!-- MODAL DE VERIFICACIÓN DE UNIFORME -->
     <div id="uniformModal" class="modal-overlay">
         <div class="modal-content">
             <h2>👔 Verificación de Uniforme</h2>
@@ -797,7 +853,6 @@
                 </select>
             </div>
 
-            <!-- SELECTOR DE MODO -->
             <div class="mode-selector">
                 <h3>Seleccione el modo de escaneo:</h3>
                 <div class="mode-buttons">
@@ -807,7 +862,6 @@
                 </div>
             </div>
 
-            <!-- MODO: LECTOR BLUETOOTH -->
             <div id="bluetoothMode" class="bluetooth-reader-box">
                 <h3>📱 Lector de Códigos Bluetooth/USB</h3>
                 <p>Coloque el cursor en el campo y escanee el código con su lector</p>
@@ -830,7 +884,6 @@
                 </p>
             </div>
             
-            <!-- MODO: CÁMARA -->
             <div id="cameraMode" class="scanner-box" style="display: none;">
                 <h2>📸 Escáner de Cámara</h2>
                 <p>Apunte la cámara al código QR o código de barras del alumno</p>
@@ -847,7 +900,6 @@
                 <div id="qr-reader"></div>
             </div>
 
-            <!-- MODO: MANUAL -->
             <div id="manualMode" class="manual-entry" style="display: none;">
                 <h3>⌨️ Ingrese el código manualmente</h3>
                 <div class="form-group">
@@ -928,6 +980,30 @@
         <div id="reports" class="tab-content">
             <h2>Reportes y Estadísticas</h2>
             
+            <!-- NUEVO: Reporte de Incidencias del Día -->
+            <div class="backup-section" style="background: #fff3e0; border-color: #ff9800;">
+                <h3>📋 Reporte de Incidencias del Día</h3>
+                <p>Genera un PDF con todas las incidencias del día seleccionado: retardos, faltas por impuntualidad y alumnos sin uniforme completo</p>
+                
+                <div class="form-group">
+                    <label>Seleccionar Fecha para el Reporte:</label>
+                    <input type="date" id="incidentDate">
+                </div>
+                
+                <div class="actions">
+                    <button class="btn btn-danger" onclick="generateIncidentsReport()">
+                        📄 Generar Reporte de Incidencias (PDF)
+                    </button>
+                </div>
+                
+                <div id="incidentsPreview" style="margin-top: 20px;"></div>
+            </div>
+            
+            <hr style="margin: 40px 0; border: none; border-top: 2px solid #e0e0e0;">
+            
+            <!-- Reporte Semanal Existente -->
+            <h3>📊 Reporte Semanal</h3>
+            
             <div class="form-group">
                 <label>Seleccionar Semana:</label>
                 <input type="week" id="weekSelect" onchange="generateWeeklyReport()">
@@ -951,8 +1027,6 @@
         let currentMode = 'bluetooth';
         let scanBuffer = '';
         let scanTimeout = null;
-        
-        // Variables para el modal de uniforme
         let pendingRecord = null;
 
         window.onload = function() {
@@ -966,85 +1040,54 @@
             updateCloudStatus();
             updateBackupInfo();
             setMode('bluetooth');
+            setIncidentDate();
         };
-
-        // ========== FUNCIONES DEL MODAL DE UNIFORME ==========
 
         function showUniformModal(student, recordData) {
             pendingRecord = recordData;
-            
             document.getElementById('modalStudentName').textContent = student.name;
             document.getElementById('modalStudentCode').textContent = student.code;
             document.getElementById('modalTime').textContent = recordData.time;
-            
             document.getElementById('uniformModal').classList.add('active');
         }
 
         function hideUniformModal() {
             document.getElementById('uniformModal').classList.remove('active');
             pendingRecord = null;
-            
-            // Reanudar el escaneo si estamos en modo cámara
             if (currentMode === 'camera' && html5QrCode && isCameraActive) {
-                setTimeout(() => {
-                    html5QrCode.resume();
-                }, 500);
+                setTimeout(() => { html5QrCode.resume(); }, 500);
             }
-            
-            // Volver a enfocar el campo de entrada según el modo
             if (currentMode === 'bluetooth') {
-                setTimeout(() => {
-                    document.getElementById('bluetoothInput').focus();
-                }, 100);
+                setTimeout(() => { document.getElementById('bluetoothInput').focus(); }, 100);
             } else if (currentMode === 'manual') {
-                setTimeout(() => {
-                    document.getElementById('manualCode').focus();
-                }, 100);
+                setTimeout(() => { document.getElementById('manualCode').focus(); }, 100);
             }
         }
 
         async function confirmUniform(hasUniform) {
             if (!pendingRecord) return;
-            
-            // Agregar el estado de uniforme al registro
             pendingRecord.uniformComplete = hasUniform;
-            
-            // Guardar el registro
             attendanceRecords.push(pendingRecord);
             saveData();
-            
-            // Guardar en la nube si está conectado
             if (isCloudConnected) {
-                await saveToCloud('saveRecord', {
-                    action: 'saveRecord',
-                    record: pendingRecord
-                });
+                await saveToCloud('saveRecord', { action: 'saveRecord', record: pendingRecord });
             }
-            
-            // Mostrar mensaje de confirmación
             const uniformIcon = hasUniform ? '✅' : '❌';
             const uniformText = hasUniform ? 'CON UNIFORME' : 'SIN UNIFORME COMPLETO';
             const punctualityIcon = pendingRecord.punctualityStatus ? 
                 (pendingRecord.punctualityStatus === 'PUNTUAL' ? '✅' : 
                  pendingRecord.punctualityStatus === 'RETARDO' ? '⚠️' : '❌') : '';
-            
             let statusMessage = `🟢 ENTRADA registrada: ${pendingRecord.studentName} - ${pendingRecord.time}<br>`;
             if (pendingRecord.punctualityStatus) {
                 statusMessage += `<strong>${punctualityIcon} ${pendingRecord.punctualityStatus}</strong><br>`;
             }
             statusMessage += `<strong>${uniformIcon} ${uniformText}</strong>`;
-            
             showStatus(statusMessage, 'success');
-            
-            // Cerrar modal
             hideUniformModal();
         }
 
-        // ========== FUNCIONES DEL LECTOR BLUETOOTH ==========
-
         function setupBluetoothReader() {
             const bluetoothInput = document.getElementById('bluetoothInput');
-            
             bluetoothInput.addEventListener('keypress', function(e) {
                 if (e.key === 'Enter') {
                     e.preventDefault();
@@ -1053,22 +1096,17 @@
                         processCode(code);
                         bluetoothInput.value = '';
                         bluetoothInput.classList.add('scan-animation');
-                        setTimeout(() => {
-                            bluetoothInput.classList.remove('scan-animation');
-                        }, 500);
+                        setTimeout(() => { bluetoothInput.classList.remove('scan-animation'); }, 500);
                     }
                 }
             });
-
             bluetoothInput.addEventListener('click', function() {
                 this.focus();
                 updateReaderStatus(true);
             });
-
             bluetoothInput.addEventListener('blur', function() {
                 updateReaderStatus(false);
             });
-
             document.addEventListener('click', function(e) {
                 if (currentMode === 'bluetooth' && e.target.id !== 'bluetoothInput') {
                     if (!e.target.matches('input, button, select, a')) {
@@ -1094,59 +1132,30 @@
             }
         }
 
-        // ========== SELECTOR DE MODO ==========
-
         function setMode(mode) {
-            if (isCameraActive) {
-                stopCamera();
-            }
-
+            if (isCameraActive) { stopCamera(); }
             currentMode = mode;
-
-            document.querySelectorAll('.mode-btn').forEach(btn => {
-                btn.classList.remove('active');
-            });
+            document.querySelectorAll('.mode-btn').forEach(btn => { btn.classList.remove('active'); });
             event.target.classList.add('active');
-
             document.getElementById('bluetoothMode').style.display = mode === 'bluetooth' ? 'block' : 'none';
             document.getElementById('cameraMode').style.display = mode === 'camera' ? 'block' : 'none';
             document.getElementById('manualMode').style.display = mode === 'manual' ? 'block' : 'none';
-
             if (mode === 'bluetooth') {
-                setTimeout(() => {
-                    document.getElementById('bluetoothInput').focus();
-                }, 100);
+                setTimeout(() => { document.getElementById('bluetoothInput').focus(); }, 100);
             } else if (mode === 'manual') {
-                setTimeout(() => {
-                    document.getElementById('manualCode').focus();
-                }, 100);
+                setTimeout(() => { document.getElementById('manualCode').focus(); }, 100);
             }
         }
-
-        // ========== FUNCIONES DE CÁMARA QR ==========
 
         function startCamera() {
             if (isCameraActive) {
                 showStatus('⚠️ La cámara ya está activa', 'info');
                 return;
             }
-
-            if (!html5QrCode) {
-                html5QrCode = new Html5Qrcode("qr-reader");
-            }
-
-            const config = {
-                fps: 10,
-                qrbox: { width: 250, height: 250 },
-                aspectRatio: 1.0
-            };
-
-            html5QrCode.start(
-                { facingMode: "environment" },
-                config,
-                onScanSuccess,
-                onScanError
-            ).then(() => {
+            if (!html5QrCode) { html5QrCode = new Html5Qrcode("qr-reader"); }
+            const config = { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 };
+            html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess, onScanError)
+            .then(() => {
                 isCameraActive = true;
                 updateCameraStatus(true);
                 showStatus('✅ Cámara iniciada correctamente', 'success');
@@ -1162,27 +1171,19 @@
                 showStatus('⚠️ La cámara no está activa', 'info');
                 return;
             }
-
             html5QrCode.stop().then(() => {
                 isCameraActive = false;
                 updateCameraStatus(false);
                 showStatus('🛑 Cámara detenida', 'info');
-            }).catch(err => {
-                console.error('Error al detener cámara:', err);
-            });
+            }).catch(err => { console.error('Error al detener cámara:', err); });
         }
 
         function onScanSuccess(decodedText, decodedResult) {
-            // Pausar temporalmente el escaneo para evitar múltiples lecturas
-            if (html5QrCode && isCameraActive) {
-                html5QrCode.pause(true);
-            }
-            
+            if (html5QrCode && isCameraActive) { html5QrCode.pause(true); }
             processCode(decodedText);
         }
 
-        function onScanError(errorMessage) {
-        }
+        function onScanError(errorMessage) {}
 
         function updateCameraStatus(active) {
             const statusDiv = document.getElementById('cameraStatus');
@@ -1195,12 +1196,9 @@
             }
         }
 
-        // ========== FUNCIONES DE RESPALDO LOCAL ==========
-
         function updateBackupInfo() {
             document.getElementById('totalStudents').textContent = students.length;
             document.getElementById('totalRecords').textContent = attendanceRecords.length;
-            
             const lastBackup = localStorage.getItem('lastBackupDate');
             if (lastBackup) {
                 const date = new Date(lastBackup);
@@ -1218,131 +1216,89 @@
                 attendanceRecords: attendanceRecords,
                 webAppUrl: webAppUrl
             };
-            
             const dataStr = JSON.stringify(backupData, null, 2);
             const blob = new Blob([dataStr], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
-            
             const filename = `respaldo_asistencia_${new Date().toISOString().split('T')[0]}.json`;
             link.setAttribute('href', url);
             link.setAttribute('download', filename);
             link.click();
-            
             localStorage.setItem('lastBackupDate', new Date().toISOString());
             updateBackupInfo();
             showBackupStatus('✅ Respaldo completo descargado exitosamente', 'success');
         }
 
         function exportStudentsOnly() {
-            const backupData = {
-                version: '1.0',
-                exportDate: new Date().toISOString(),
-                students: students
-            };
-            
+            const backupData = { version: '1.0', exportDate: new Date().toISOString(), students: students };
             const dataStr = JSON.stringify(backupData, null, 2);
             const blob = new Blob([dataStr], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
-            
             const filename = `alumnos_${new Date().toISOString().split('T')[0]}.json`;
             link.setAttribute('href', url);
             link.setAttribute('download', filename);
             link.click();
-            
             showBackupStatus('✅ Lista de alumnos descargada exitosamente', 'success');
         }
 
         function exportRecordsOnly() {
-            const backupData = {
-                version: '1.0',
-                exportDate: new Date().toISOString(),
-                attendanceRecords: attendanceRecords
-            };
-            
+            const backupData = { version: '1.0', exportDate: new Date().toISOString(), attendanceRecords: attendanceRecords };
             const dataStr = JSON.stringify(backupData, null, 2);
             const blob = new Blob([dataStr], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
-            
             const filename = `registros_${new Date().toISOString().split('T')[0]}.json`;
             link.setAttribute('href', url);
             link.setAttribute('download', filename);
             link.click();
-            
             showBackupStatus('✅ Registros descargados exitosamente', 'success');
         }
 
         function importBackup(event) {
             const file = event.target.files[0];
             if (!file) return;
-            
             const reader = new FileReader();
             reader.onload = function(e) {
                 try {
                     const backupData = JSON.parse(e.target.result);
-                    
                     if (!backupData.version) {
                         showBackupStatus('❌ Archivo inválido: no es un respaldo válido', 'error');
                         return;
                     }
-                    
                     const hasData = students.length > 0 || attendanceRecords.length > 0;
                     if (hasData) {
                         const confirmImport = confirm(
                             '⚠️ ADVERTENCIA: Esto reemplazará todos los datos actuales.\n\n' +
-                            `Datos actuales:\n` +
-                            `- Alumnos: ${students.length}\n` +
-                            `- Registros: ${attendanceRecords.length}\n\n` +
-                            `Datos a importar:\n` +
-                            `- Alumnos: ${backupData.students?.length || 0}\n` +
-                            `- Registros: ${backupData.attendanceRecords?.length || 0}\n\n` +
+                            `Datos actuales:\n- Alumnos: ${students.length}\n- Registros: ${attendanceRecords.length}\n\n` +
+                            `Datos a importar:\n- Alumnos: ${backupData.students?.length || 0}\n- Registros: ${backupData.attendanceRecords?.length || 0}\n\n` +
                             '¿Desea continuar?'
                         );
-                        
                         if (!confirmImport) {
                             showBackupStatus('❌ Importación cancelada', 'error');
                             event.target.value = '';
                             return;
                         }
                     }
-                    
-                    if (backupData.students) {
-                        students = backupData.students;
-                    }
-                    
-                    if (backupData.attendanceRecords) {
-                        attendanceRecords = backupData.attendanceRecords;
-                    }
-                    
+                    if (backupData.students) { students = backupData.students; }
+                    if (backupData.attendanceRecords) { attendanceRecords = backupData.attendanceRecords; }
                     if (backupData.webAppUrl) {
                         webAppUrl = backupData.webAppUrl;
                         localStorage.setItem('webAppUrl', webAppUrl);
                         document.getElementById('webAppUrl').value = webAppUrl;
                     }
-                    
                     saveData();
                     displayStudents();
                     displayRecords();
                     updateBackupInfo();
-                    
                     const studentsCount = backupData.students?.length || 0;
                     const recordsCount = backupData.attendanceRecords?.length || 0;
-                    
-                    showBackupStatus(
-                        `✅ Respaldo importado exitosamente\n` +
-                        `📊 ${studentsCount} alumnos y ${recordsCount} registros restaurados`, 
-                        'success'
-                    );
-                    
+                    showBackupStatus(`✅ Respaldo importado exitosamente\n📊 ${studentsCount} alumnos y ${recordsCount} registros restaurados`, 'success');
                 } catch (error) {
                     showBackupStatus('❌ Error al leer el archivo: ' + error.message, 'error');
                 }
-                
                 event.target.value = '';
             };
-            
             reader.readAsText(file);
         }
 
@@ -1351,14 +1307,9 @@
             statusDiv.className = 'status-box ' + type;
             statusDiv.innerHTML = message.replace(/\n/g, '<br>');
             statusDiv.style.display = 'block';
-            
-            setTimeout(() => {
-                statusDiv.style.display = 'none';
-            }, 5000);
+            setTimeout(() => { statusDiv.style.display = 'none'; }, 5000);
         }
 
-        // ========== CONFIGURACIÓN Y CONEXIÓN A LA NUBE ==========
-        
         function loadConfig() {
             webAppUrl = localStorage.getItem('webAppUrl') || '';
             if (webAppUrl) {
@@ -1383,13 +1334,10 @@
                 showConfigStatus('❌ Configure la URL del Web App primero', 'error');
                 return;
             }
-            
             showConfigStatus('🔄 Probando conexión...', 'info');
-            
             try {
                 const response = await fetch(webAppUrl + '?action=getStudents');
                 const data = await response.json();
-                
                 if (data.success) {
                     isCloudConnected = true;
                     showConfigStatus('✅ Conexión exitosa con Google Sheets', 'success');
@@ -1419,13 +1367,8 @@
 
         async function saveToCloud(endpoint, data) {
             if (!isCloudConnected || !webAppUrl) return false;
-            
             try {
-                const response = await fetch(webAppUrl, {
-                    method: 'POST',
-                    body: JSON.stringify(data)
-                });
-                
+                const response = await fetch(webAppUrl, { method: 'POST', body: JSON.stringify(data) });
                 const result = await response.json();
                 return result.success;
             } catch (error) {
@@ -1440,22 +1383,12 @@
                 showTab('config');
                 return;
             }
-            
             showConfigStatus('🔄 Sincronizando...', 'info');
-            
             try {
-                await saveToCloud('saveStudents', {
-                    action: 'saveStudents',
-                    students: students
-                });
-                
+                await saveToCloud('saveStudents', { action: 'saveStudents', students: students });
                 for (const record of attendanceRecords) {
-                    await saveToCloud('saveRecord', {
-                        action: 'saveRecord',
-                        record: record
-                    });
+                    await saveToCloud('saveRecord', { action: 'saveRecord', record: record });
                 }
-                
                 showConfigStatus('✅ Sincronización completada', 'success');
             } catch (error) {
                 showConfigStatus('❌ Error en sincronización: ' + error.message, 'error');
@@ -1468,29 +1401,22 @@
                 showTab('config');
                 return;
             }
-            
             showConfigStatus('🔄 Cargando desde la nube...', 'info');
-            
             try {
                 const studentsResponse = await fetch(webAppUrl + '?action=getStudents');
                 const studentsData = await studentsResponse.json();
-                
                 if (studentsData.success && studentsData.students.length > 0) {
                     students = studentsData.students;
                 }
-                
                 const recordsResponse = await fetch(webAppUrl + '?action=getRecords');
                 const recordsData = await recordsResponse.json();
-                
                 if (recordsData.success && recordsData.records.length > 0) {
                     attendanceRecords = recordsData.records;
                 }
-                
                 saveData();
                 displayStudents();
                 displayRecords();
                 updateBackupInfo();
-                
                 showConfigStatus('✅ Datos cargados desde la nube', 'success');
             } catch (error) {
                 showConfigStatus('❌ Error cargando datos: ' + error.message, 'error');
@@ -1504,11 +1430,8 @@
             statusDiv.style.display = 'block';
         }
 
-        // ========== FUNCIONES PRINCIPALES ==========
-
         function setupManualInput() {
             const manualInput = document.getElementById('manualCode');
-            
             manualInput.addEventListener('keypress', function(e) {
                 if (e.key === 'Enter') {
                     e.preventDefault();
@@ -1520,7 +1443,6 @@
         function loadData() {
             const storedStudents = localStorage.getItem('students');
             const storedRecords = localStorage.getItem('attendanceRecords');
-            
             if (storedStudents) students = JSON.parse(storedStudents);
             if (storedRecords) attendanceRecords = JSON.parse(storedRecords);
         }
@@ -1537,20 +1459,11 @@
         }
 
         function showTab(tabName) {
-            if (isCameraActive && tabName !== 'scanner') {
-                stopCamera();
-            }
-
-            document.querySelectorAll('.tab-content').forEach(tab => {
-                tab.classList.remove('active');
-            });
-            document.querySelectorAll('.tab').forEach(tab => {
-                tab.classList.remove('active');
-            });
-            
+            if (isCameraActive && tabName !== 'scanner') { stopCamera(); }
+            document.querySelectorAll('.tab-content').forEach(tab => { tab.classList.remove('active'); });
+            document.querySelectorAll('.tab').forEach(tab => { tab.classList.remove('active'); });
             document.getElementById(tabName).classList.add('active');
             event.target.classList.add('active');
-            
             if (tabName === 'records') {
                 displayRecords();
             } else if (tabName === 'reports') {
@@ -1558,9 +1471,7 @@
             } else if (tabName === 'config') {
                 updateBackupInfo();
             } else if (tabName === 'scanner' && currentMode === 'bluetooth') {
-                setTimeout(() => {
-                    document.getElementById('bluetoothInput').focus();
-                }, 100);
+                setTimeout(() => { document.getElementById('bluetoothInput').focus(); }, 100);
             }
         }
 
@@ -1576,75 +1487,51 @@
 
         async function processCode(code) {
             const student = students.find(s => s.code === code);
-            
             if (!student) {
                 showStatus('❌ Alumno no encontrado: ' + code, 'error');
-                // Reanudar cámara si está en modo cámara
                 if (currentMode === 'camera' && html5QrCode && isCameraActive) {
-                    setTimeout(() => {
-                        html5QrCode.resume();
-                    }, 2000);
+                    setTimeout(() => { html5QrCode.resume(); }, 2000);
                 }
                 return;
             }
-            
             const recordType = document.getElementById('recordType').value;
             const now = new Date();
             const todayDate = now.toLocaleDateString('es-MX');
-            
             const existingRecord = attendanceRecords.find(r => 
-                r.studentCode === code && 
-                r.date === todayDate && 
-                r.type === recordType
+                r.studentCode === code && r.date === todayDate && r.type === recordType
             );
-            
             if (existingRecord) {
-                const icon = recordType === 'entrada' ? '⚠️' : '⚠️';
                 const typeText = recordType === 'entrada' ? 'ENTRADA' : 'SALIDA';
                 showStatus(
-                    `${icon} ENTRADA DE ALUMNO YA SE REGISTRÓ ANTES<br>` +
+                    `⚠️ ${typeText} DE ALUMNO YA SE REGISTRÓ ANTES<br>` +
                     `<strong>${student.name}</strong><br>` +
                     `<strong>Hora del registro: ${existingRecord.time}</strong><br>` +
                     `<strong>Estado: ${existingRecord.punctualityStatus || 'N/A'}</strong>`,
                     'info'
                 );
-                
-                // Reanudar cámara si está en modo cámara
                 if (currentMode === 'camera' && html5QrCode && isCameraActive) {
-                    setTimeout(() => {
-                        html5QrCode.resume();
-                    }, 3000);
+                    setTimeout(() => { html5QrCode.resume(); }, 3000);
                 }
                 return;
             }
-            
             let punctualityStatus = '';
-            let punctualityIcon = '';
-            
             if (recordType === 'entrada') {
                 const hours = now.getHours();
                 const minutes = now.getMinutes();
                 const totalMinutes = hours * 60 + minutes;
-                
                 const time_6_30 = 6 * 60 + 30;
                 const time_7_00 = 7 * 60;
                 const time_7_05 = 7 * 60 + 5;
-                
                 if (totalMinutes >= time_6_30 && totalMinutes < time_7_00) {
                     punctualityStatus = 'PUNTUAL';
-                    punctualityIcon = '✅';
                 } else if (totalMinutes >= time_7_00 && totalMinutes < time_7_05) {
                     punctualityStatus = 'RETARDO';
-                    punctualityIcon = '⚠️';
                 } else if (totalMinutes >= time_7_05) {
                     punctualityStatus = 'FALTA POR IMPUNTUALIDAD';
-                    punctualityIcon = '❌';
                 } else {
                     punctualityStatus = 'ENTRADA ANTICIPADA';
-                    punctualityIcon = '🕐';
                 }
             }
-            
             const record = {
                 studentCode: code,
                 studentName: student.name,
@@ -1655,32 +1542,17 @@
                 punctualityStatus: punctualityStatus,
                 uniformComplete: null
             };
-            
-            // Si es ENTRADA, mostrar modal de uniforme
             if (recordType === 'entrada') {
-                // Pequeño delay para asegurar que el modal se muestre correctamente en móviles
-                setTimeout(() => {
-                    showUniformModal(student, record);
-                }, 300);
+                setTimeout(() => { showUniformModal(student, record); }, 300);
             } else {
-                // Si es SALIDA, registrar directamente
                 attendanceRecords.push(record);
                 saveData();
-                
                 if (isCloudConnected) {
-                    await saveToCloud('saveRecord', {
-                        action: 'saveRecord',
-                        record: record
-                    });
+                    await saveToCloud('saveRecord', { action: 'saveRecord', record: record });
                 }
-                
                 showStatus(`🔴 SALIDA registrada: ${student.name} - ${record.time}`, 'success');
-                
-                // Reanudar cámara si está en modo cámara
                 if (currentMode === 'camera' && html5QrCode && isCameraActive) {
-                    setTimeout(() => {
-                        html5QrCode.resume();
-                    }, 2000);
+                    setTimeout(() => { html5QrCode.resume(); }, 2000);
                 }
             }
         }
@@ -1690,43 +1562,30 @@
             statusDiv.className = 'status-box ' + type;
             statusDiv.innerHTML = message;
             statusDiv.style.display = 'block';
-            
             const timeout = type === 'info' ? 5000 : 3000;
-            
-            setTimeout(() => {
-                statusDiv.style.display = 'none';
-            }, timeout);
+            setTimeout(() => { statusDiv.style.display = 'none'; }, timeout);
         }
-
-        // ========== IMPORTAR ALUMNOS DESDE CSV ==========
 
         function importStudentsCSV(event) {
             const file = event.target.files[0];
             if (!file) return;
-            
             const reader = new FileReader();
             reader.onload = function(e) {
                 try {
                     const csvContent = e.target.result;
                     const lines = csvContent.split('\n');
-                    
                     if (lines.length < 2) {
                         showImportStudentsStatus('❌ El archivo está vacío o no contiene datos', 'error');
                         return;
                     }
-                    
                     if (students.length > 0) {
                         const confirm = window.confirm(
                             `⚠️ Ya hay ${students.length} alumnos registrados.\n\n` +
                             '¿Desea agregar los nuevos alumnos a la lista existente?\n\n' +
                             'Presione OK para agregar o Cancelar para reemplazar todos los alumnos.'
                         );
-                        
                         if (!confirm) {
-                            const confirmReplace = window.confirm(
-                                '⚠️ ADVERTENCIA: Esto eliminará todos los alumnos actuales.\n\n¿Está seguro?'
-                            );
-                            
+                            const confirmReplace = window.confirm('⚠️ ADVERTENCIA: Esto eliminará todos los alumnos actuales.\n\n¿Está seguro?');
                             if (confirmReplace) {
                                 students = [];
                             } else {
@@ -1735,69 +1594,44 @@
                             }
                         }
                     }
-                    
                     let importedCount = 0;
                     let skippedCount = 0;
                     let errorCount = 0;
-                    
-                    const startLine = lines[0].toLowerCase().includes('nombre') || 
-                                     lines[0].toLowerCase().includes('curp') ? 1 : 0;
-                    
+                    const startLine = lines[0].toLowerCase().includes('nombre') || lines[0].toLowerCase().includes('curp') ? 1 : 0;
                     for (let i = startLine; i < lines.length; i++) {
                         const line = lines[i].trim();
                         if (!line) continue;
-                        
                         const columns = line.split(',').map(col => col.trim().replace(/^"|"$/g, ''));
-                        
                         if (columns.length < 4) {
                             errorCount++;
                             continue;
                         }
-                        
                         const name = columns[0];
                         const curp = columns[1].toUpperCase();
                         const semester = columns[2];
                         const group = columns[3];
-                        
                         if (!name || !curp) {
                             errorCount++;
                             continue;
                         }
-                        
                         if (students.find(s => s.code === curp)) {
                             skippedCount++;
                             continue;
                         }
-                        
-                        students.push({
-                            name: name,
-                            code: curp,
-                            curp: curp,
-                            semester: semester,
-                            group: group,
-                            grade: `${semester}° ${group}`
-                        });
-                        
+                        students.push({ name: name, code: curp, curp: curp, semester: semester, group: group, grade: `${semester}° ${group}` });
                         importedCount++;
                     }
-                    
                     saveData();
                     displayStudents();
-                    
-                    let message = `✅ Importación completada:\n`;
-                    message += `✔️ ${importedCount} alumnos importados\n`;
+                    let message = `✅ Importación completada:\n✔️ ${importedCount} alumnos importados\n`;
                     if (skippedCount > 0) message += `⚠️ ${skippedCount} alumnos duplicados (omitidos)\n`;
                     if (errorCount > 0) message += `❌ ${errorCount} líneas con errores`;
-                    
                     showImportStudentsStatus(message, importedCount > 0 ? 'success' : 'error');
-                    
                 } catch (error) {
                     showImportStudentsStatus('❌ Error al procesar el archivo: ' + error.message, 'error');
                 }
-                
                 event.target.value = '';
             };
-            
             reader.readAsText(file);
         }
 
@@ -1806,10 +1640,7 @@
             statusDiv.className = 'status-box ' + type;
             statusDiv.innerHTML = message.replace(/\n/g, '<br>');
             statusDiv.style.display = 'block';
-            
-            setTimeout(() => {
-                statusDiv.style.display = 'none';
-            }, 7000);
+            setTimeout(() => { statusDiv.style.display = 'none'; }, 7000);
         }
 
         async function addStudent() {
@@ -1817,44 +1648,27 @@
             const curp = document.getElementById('studentCURP').value.trim().toUpperCase();
             const semester = document.getElementById('studentSemester').value.trim();
             const group = document.getElementById('studentGroup').value.trim();
-            
             if (!name || !curp) {
                 alert('Por favor complete nombre y CURP');
                 return;
             }
-            
             if (curp.length !== 18) {
                 alert('El CURP debe tener exactamente 18 caracteres');
                 return;
             }
-            
             if (students.find(s => s.code === curp)) {
                 alert('Ya existe un alumno con ese CURP');
                 return;
             }
-            
-            students.push({ 
-                name, 
-                code: curp,
-                curp: curp,
-                semester: semester,
-                group: group,
-                grade: `${semester}° ${group}`
-            });
+            students.push({ name, code: curp, curp: curp, semester: semester, group: group, grade: `${semester}° ${group}` });
             saveData();
-            
             if (isCloudConnected) {
-                await saveToCloud('saveStudents', {
-                    action: 'saveStudents',
-                    students: students
-                });
+                await saveToCloud('saveStudents', { action: 'saveStudents', students: students });
             }
-            
             document.getElementById('studentName').value = '';
             document.getElementById('studentCURP').value = '';
             document.getElementById('studentSemester').value = '';
             document.getElementById('studentGroup').value = '';
-            
             displayStudents();
             alert('Alumno agregado exitosamente');
         }
@@ -1865,7 +1679,6 @@
                 container.innerHTML = '<p style="text-align: center; color: #999; padding: 40px;">No hay alumnos registrados</p>';
                 return;
             }
-            
             container.innerHTML = students.map((student, index) => `
                 <div class="student-card">
                     <h3>${student.name}</h3>
@@ -1881,14 +1694,9 @@
             if (confirm('¿Eliminar este alumno?')) {
                 students.splice(index, 1);
                 saveData();
-                
                 if (isCloudConnected) {
-                    await saveToCloud('saveStudents', {
-                        action: 'saveStudents',
-                        students: students
-                    });
+                    await saveToCloud('saveStudents', { action: 'saveStudents', students: students });
                 }
-                
                 displayStudents();
             }
         }
@@ -1896,24 +1704,19 @@
         function displayRecords() {
             const container = document.getElementById('recordsTable');
             const filterDate = document.getElementById('filterDate').value;
-            
             let filtered = attendanceRecords;
             if (filterDate) {
                 const filterDateObj = new Date(filterDate + 'T00:00:00');
                 const filterDateStr = filterDateObj.toLocaleDateString('es-MX');
                 filtered = attendanceRecords.filter(r => r.date === filterDateStr);
             }
-            
             if (filtered.length === 0) {
                 container.innerHTML = '<p style="text-align: center; color: #999; padding: 40px;">No hay registros para mostrar</p>';
                 return;
             }
-            
             const groupedRecords = {};
-            
             filtered.forEach(record => {
                 const key = `${record.studentCode}_${record.date}`;
-                
                 if (!groupedRecords[key]) {
                     groupedRecords[key] = {
                         studentName: record.studentName,
@@ -1926,7 +1729,6 @@
                         timestamp: record.timestamp
                     };
                 }
-                
                 if (record.type === 'entrada') {
                     groupedRecords[key].entrada = record.time;
                     groupedRecords[key].punctualityStatus = record.punctualityStatus || '';
@@ -1935,9 +1737,7 @@
                     groupedRecords[key].salida = record.time;
                 }
             });
-            
             const sortedRecords = Object.values(groupedRecords).sort((a, b) => b.timestamp - a.timestamp);
-            
             container.innerHTML = `
                 <table>
                     <thead>
@@ -1954,7 +1754,6 @@
                         ${sortedRecords.map(record => {
                             let statusCell = '<span style="color: #999;">-</span>';
                             let statusColor = '';
-                            
                             if (record.punctualityStatus) {
                                 if (record.punctualityStatus === 'PUNTUAL') {
                                     statusCell = '<span style="color: #28a745; font-weight: bold;">✅ PUNTUAL</span>';
@@ -1970,14 +1769,12 @@
                                     statusColor = 'background: #d1ecf1;';
                                 }
                             }
-                            
                             let uniformCell = '<span style="color: #999;">-</span>';
                             if (record.uniformComplete === true) {
                                 uniformCell = '<span style="color: #28a745; font-weight: bold;">✅ SÍ</span>';
                             } else if (record.uniformComplete === false) {
                                 uniformCell = '<span style="color: #dc3545; font-weight: bold;">❌ NO</span>';
                             }
-                            
                             return `
                                 <tr style="${statusColor}">
                                     <td>${record.date}</td>
@@ -2011,12 +1808,9 @@
                 alert('No hay registros para exportar');
                 return;
             }
-            
             const groupedRecords = {};
-            
             attendanceRecords.forEach(record => {
                 const key = `${record.studentCode}_${record.date}`;
-                
                 if (!groupedRecords[key]) {
                     groupedRecords[key] = {
                         studentName: record.studentName,
@@ -2027,7 +1821,6 @@
                         uniformComplete: ''
                     };
                 }
-                
                 if (record.type === 'entrada') {
                     groupedRecords[key].entrada = record.time;
                     groupedRecords[key].punctualityStatus = record.punctualityStatus || '';
@@ -2040,14 +1833,12 @@
                     groupedRecords[key].salida = record.time;
                 }
             });
-            
             let csv = 'Fecha,Alumno,Hora de Entrada,Estado,Uniforme Completo,Hora de Salida\n';
             Object.values(groupedRecords).forEach(record => {
                 const status = record.punctualityStatus || '';
                 const uniform = record.uniformComplete || '';
                 csv += `${record.date},${record.studentName},${record.entrada},${status},${uniform},${record.salida}\n`;
             });
-            
             const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement('a');
             const url = URL.createObjectURL(blob);
@@ -2056,112 +1847,260 @@
             link.click();
         }
 
+        function setIncidentDate() {
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('incidentDate').value = today;
+        }
+
+        function generateIncidentsReport() {
+            const dateInput = document.getElementById('incidentDate').value;
+            if (!dateInput) {
+                alert('Por favor seleccione una fecha');
+                return;
+            }
+            const selectedDate = new Date(dateInput + 'T00:00:00');
+            const dateStr = selectedDate.toLocaleDateString('es-MX');
+            const dayOfWeek = selectedDate.getDay();
+            if (dayOfWeek === 0 || dayOfWeek === 6) {
+                alert('⚠️ La fecha seleccionada es fin de semana. Por favor seleccione un día hábil (lunes a viernes).');
+                return;
+            }
+            const dayRecords = attendanceRecords.filter(r => r.date === dateStr);
+            if (dayRecords.length === 0) {
+                alert('No hay registros para la fecha seleccionada');
+                document.getElementById('incidentsPreview').innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">No hay registros para mostrar</p>';
+                return;
+            }
+            const studentIncidents = {};
+            dayRecords.forEach(record => {
+                if (record.type === 'entrada') {
+                    const hasIncident = record.punctualityStatus === 'RETARDO' || record.punctualityStatus === 'FALTA POR IMPUNTUALIDAD' || record.uniformComplete === false;
+                    if (hasIncident) {
+                        if (!studentIncidents[record.studentCode]) {
+                            studentIncidents[record.studentCode] = {
+                                name: record.studentName,
+                                code: record.studentCode,
+                                time: record.time,
+                                incidents: []
+                            };
+                        }
+                        if (record.punctualityStatus === 'RETARDO') {
+                            studentIncidents[record.studentCode].incidents.push({
+                                type: 'retardo',
+                                icon: '⚠️',
+                                text: 'RETARDO',
+                                detail: `Llegó a las ${record.time}`
+                            });
+                        }
+                        if (record.punctualityStatus === 'FALTA POR IMPUNTUALIDAD') {
+                            studentIncidents[record.studentCode].incidents.push({
+                                type: 'falta',
+                                icon: '❌',
+                                text: 'FALTA POR IMPUNTUALIDAD',
+                                detail: `Llegó a las ${record.time} (después de las 7:05 AM)`
+                            });
+                        }
+                        if (record.uniformComplete === false) {
+                            studentIncidents[record.studentCode].incidents.push({
+                                type: 'uniforme',
+                                icon: '👔',
+                                text: 'SIN UNIFORME COMPLETO',
+                                detail: 'No portaba el uniforme completo'
+                            });
+                        }
+                    }
+                }
+            });
+            const incidentsList = Object.values(studentIncidents);
+            if (incidentsList.length === 0) {
+                alert('✅ ¡Excelente! No hay incidencias en la fecha seleccionada');
+                document.getElementById('incidentsPreview').innerHTML = '<div class="status-box success">✅ No hay incidencias para esta fecha</div>';
+                return;
+            }
+            let totalFaltas = 0;
+            let totalRetardos = 0;
+            let totalSinUniforme = 0;
+            incidentsList.forEach(student => {
+                student.incidents.forEach(incident => {
+                    if (incident.type === 'falta') totalFaltas++;
+                    if (incident.type === 'retardo') totalRetardos++;
+                    if (incident.type === 'uniforme') totalSinUniforme++;
+                });
+            });
+            showIncidentsPreview(incidentsList, dateStr, totalFaltas, totalRetardos, totalSinUniforme);
+            generateIncidentsPDF(incidentsList, dateStr, totalFaltas, totalRetardos, totalSinUniforme);
+        }
+
+        function showIncidentsPreview(incidentsList, dateStr, totalFaltas, totalRetardos, totalSinUniforme) {
+            const preview = document.getElementById('incidentsPreview');
+            preview.innerHTML = `
+                <div class="incident-summary">
+                    <h4>Resumen de Incidencias - ${dateStr}</h4>
+                    <div class="incident-stats">
+                        <div class="incident-stat falta">
+                            <h3>${totalFaltas}</h3>
+                            <p>Faltas por Impuntualidad</p>
+                        </div>
+                        <div class="incident-stat retardo">
+                            <h3>${totalRetardos}</h3>
+                            <p>Retardos</p>
+                        </div>
+                        <div class="incident-stat uniforme">
+                            <h3>${totalSinUniforme}</h3>
+                            <p>Sin Uniforme</p>
+                        </div>
+                        <div class="incident-stat">
+                            <h3>${incidentsList.length}</h3>
+                            <p>Total Alumnos con Incidencias</p>
+                        </div>
+                    </div>
+                </div>
+                <h4 style="margin: 20px 0;">Detalle de Incidencias:</h4>
+                ${incidentsList.map(student => `
+                    <div class="incident-card ${student.incidents[0].type}">
+                        <h4 style="margin-bottom: 10px; color: #333;">${student.name}</h4>
+                        <p style="color: #666; margin-bottom: 10px;"><strong>CURP:</strong> ${student.code}</p>
+                        <p style="color: #666; margin-bottom: 10px;"><strong>Hora de entrada:</strong> ${student.time}</p>
+                        <div style="margin-top: 10px;">
+                            ${student.incidents.map(incident => `
+                                <div style="background: white; padding: 10px; margin: 5px 0; border-radius: 5px; border-left: 3px solid ${
+                                    incident.type === 'falta' ? '#dc3545' : incident.type === 'retardo' ? '#ff9800' : '#ffc107'
+                                };">
+                                    <strong>${incident.icon} ${incident.text}</strong><br>
+                                    <small style="color: #666;">${incident.detail}</small>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `).join('')}
+            `;
+        }
+
+        function generateIncidentsPDF(incidentsList, dateStr, totalFaltas, totalRetardos, totalSinUniforme) {
+            const htmlContent = `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
+                body{font-family:Arial,sans-serif;margin:40px}.header{text-align:center;margin-bottom:30px;border-bottom:3px solid #0A6EB4;padding-bottom:20px}
+                .header h1{color:#0A6EB4;margin:0}.header h2{color:#666;margin:10px 0;font-weight:normal}
+                .summary{background:#f8f9fa;padding:20px;border-radius:10px;margin:20px 0}
+                .summary-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:15px;margin-top:15px}
+                .summary-item{text-align:center;padding:15px;background:white;border-radius:8px;border:2px solid #e0e0e0}
+                .summary-item h3{font-size:32px;margin:0 0 5px 0}.summary-item.falta h3{color:#dc3545}
+                .summary-item.retardo h3{color:#ff9800}.summary-item.uniforme h3{color:#ffc107}
+                .summary-item p{margin:0;font-size:12px;color:#666}
+                .student{page-break-inside:avoid;margin:20px 0;padding:15px;border:2px solid #e0e0e0;border-radius:10px;background:white}
+                .student-header{margin-bottom:10px}.student-header h3{margin:0 0 5px 0;color:#333}
+                .student-header p{margin:3px 0;color:#666;font-size:14px}
+                .incident{margin:8px 0;padding:10px;background:#f8f9fa;border-radius:5px}
+                .incident.falta{border-left:4px solid #dc3545}.incident.retardo{border-left:4px solid #ff9800}
+                .incident.uniforme{border-left:4px solid #ffc107}.incident strong{display:block;margin-bottom:5px}
+                .incident small{color:#666}.footer{margin-top:40px;padding-top:20px;border-top:2px solid #e0e0e0;text-align:center;color:#666;font-size:12px}
+            </style></head><body>
+                <div class="header">
+                    <h1>COLEGIO LEONARD EULERD</h1>
+                    <h2>Reporte de Incidencias del Día</h2>
+                    <p style="font-size:16px;color:#666;">Fecha: ${dateStr}</p>
+                </div>
+                <div class="summary">
+                    <h3 style="text-align:center;color:#0A6EB4;margin-top:0;">Resumen de Incidencias</h3>
+                    <div class="summary-grid">
+                        <div class="summary-item falta"><h3>${totalFaltas}</h3><p>Faltas por<br>Impuntualidad</p></div>
+                        <div class="summary-item retardo"><h3>${totalRetardos}</h3><p>Retardos</p></div>
+                        <div class="summary-item uniforme"><h3>${totalSinUniforme}</h3><p>Sin Uniforme<br>Completo</p></div>
+                        <div class="summary-item"><h3>${incidentsList.length}</h3><p>Total Alumnos<br>con Incidencias</p></div>
+                    </div>
+                </div>
+                <h3 style="color:#0A6EB4;margin-top:30px;">Detalle de Incidencias por Alumno:</h3>
+                ${incidentsList.map(student => `
+                    <div class="student">
+                        <div class="student-header">
+                            <h3>${student.name}</h3>
+                            <p><strong>CURP:</strong> ${student.code}</p>
+                            <p><strong>Hora de entrada:</strong> ${student.time}</p>
+                        </div>
+                        ${student.incidents.map(incident => `
+                            <div class="incident ${incident.type}">
+                                <strong>${incident.icon} ${incident.text}</strong>
+                                <small>${incident.detail}</small>
+                            </div>
+                        `).join('')}
+                    </div>
+                `).join('')}
+                <div class="footer">
+                    <p><strong>Leyenda:</strong></p>
+                    <p>❌ FALTA POR IMPUNTUALIDAD: Entrada después de las 7:05 AM</p>
+                    <p>⚠️ RETARDO: Entrada entre 7:00 AM y 7:05 AM</p>
+                    <p>👔 SIN UNIFORME COMPLETO: El alumno no portaba el uniforme reglamentario completo</p>
+                    <br><p>Documento generado el ${new Date().toLocaleString('es-MX')}</p>
+                    <p style="margin-top:10px;font-style:italic;">"Estudia y Vencerás"</p>
+                </div>
+            </body></html>`;
+            const printWindow = window.open('', '_blank');
+            printWindow.document.write(htmlContent);
+            printWindow.document.close();
+            printWindow.onload = function() {
+                setTimeout(() => { printWindow.print(); }, 250);
+            };
+        }
+
         function generateWeeklyReport() {
             const weekInput = document.getElementById('weekSelect').value;
-            
             if (!weekInput) {
                 document.getElementById('weeklyReport').innerHTML = '<p style="text-align: center; color: #999;">Seleccione una semana para ver el reporte</p>';
                 document.getElementById('statsGrid').innerHTML = '';
                 return;
             }
-            
             const [year, week] = weekInput.split('-W');
             const weekStart = getDateOfISOWeek(parseInt(week), parseInt(year));
             const weekEnd = new Date(weekStart);
             weekEnd.setDate(weekEnd.getDate() + 6);
-            
             const today = new Date();
             today.setHours(0, 0, 0, 0);
-            
             let workDaysInWeek = 0;
             let workDaysPassed = 0;
-            const workDaysList = [];
-            
             for (let i = 0; i < 7; i++) {
                 const currentDay = new Date(weekStart);
                 currentDay.setDate(weekStart.getDate() + i);
                 const dayOfWeek = currentDay.getDay();
-                
                 if (dayOfWeek >= 1 && dayOfWeek <= 5) {
                     workDaysInWeek++;
-                    workDaysList.push(new Date(currentDay));
-                    
                     if (currentDay <= today) {
                         workDaysPassed++;
                     }
                 }
             }
-            
             const weekRecords = attendanceRecords.filter(record => {
                 const recordDate = parseDate(record.date);
                 const dayOfWeek = recordDate.getDay();
-                
-                return recordDate >= weekStart && 
-                       recordDate <= weekEnd && 
-                       dayOfWeek >= 1 && 
-                       dayOfWeek <= 5 &&
-                       recordDate <= today;
+                return recordDate >= weekStart && recordDate <= weekEnd && dayOfWeek >= 1 && dayOfWeek <= 5 && recordDate <= today;
             });
-            
             const totalRegistros = weekRecords.length;
             const totalEntradas = weekRecords.filter(r => r.type === 'entrada').length;
             const totalSalidas = weekRecords.filter(r => r.type === 'salida').length;
             const alumnosUnicos = new Set(weekRecords.map(r => r.studentCode)).size;
-            
             const weekInfo = workDaysPassed < workDaysInWeek 
-                ? `<p style="background: #fff3e0; padding: 15px; border-radius: 8px; text-align: center; margin: 20px 0; border: 2px solid #ff9800;">
-                     ⚠️ <strong>Semana en curso:</strong> Se han contabilizado ${workDaysPassed} de ${workDaysInWeek} días hábiles (lunes a viernes)
-                   </p>`
-                : `<p style="background: #e8f5e9; padding: 15px; border-radius: 8px; text-align: center; margin: 20px 0; border: 2px solid #4caf50;">
-                     ✅ <strong>Semana completa:</strong> ${workDaysInWeek} días hábiles contabilizados (lunes a viernes)
-                   </p>`;
-            
+                ? `<p style="background:#fff3e0;padding:15px;border-radius:8px;text-align:center;margin:20px 0;border:2px solid #ff9800;">⚠️ <strong>Semana en curso:</strong> Se han contabilizado ${workDaysPassed} de ${workDaysInWeek} días hábiles (lunes a viernes)</p>`
+                : `<p style="background:#e8f5e9;padding:15px;border-radius:8px;text-align:center;margin:20px 0;border:2px solid #4caf50;">✅ <strong>Semana completa:</strong> ${workDaysInWeek} días hábiles contabilizados (lunes a viernes)</p>`;
             document.getElementById('statsGrid').innerHTML = weekInfo + `
-                <div class="stat-card">
-                    <h3>${workDaysPassed}</h3>
-                    <p>Días Hábiles Transcurridos</p>
-                </div>
-                <div class="stat-card">
-                    <h3>${totalRegistros}</h3>
-                    <p>Total de Registros</p>
-                </div>
-                <div class="stat-card">
-                    <h3>${totalEntradas}</h3>
-                    <p>Entradas</p>
-                </div>
-                <div class="stat-card">
-                    <h3>${totalSalidas}</h3>
-                    <p>Salidas</p>
-                </div>
-                <div class="stat-card">
-                    <h3>${alumnosUnicos}</h3>
-                    <p>Alumnos que Asistieron</p>
-                </div>
+                <div class="stat-card"><h3>${workDaysPassed}</h3><p>Días Hábiles Transcurridos</p></div>
+                <div class="stat-card"><h3>${totalRegistros}</h3><p>Total de Registros</p></div>
+                <div class="stat-card"><h3>${totalEntradas}</h3><p>Entradas</p></div>
+                <div class="stat-card"><h3>${totalSalidas}</h3><p>Salidas</p></div>
+                <div class="stat-card"><h3>${alumnosUnicos}</h3><p>Alumnos que Asistieron</p></div>
             `;
-            
             const studentStats = {};
             students.forEach(student => {
                 const studentRecords = weekRecords.filter(r => r.studentCode === student.code);
                 const entradas = studentRecords.filter(r => r.type === 'entrada');
-                
                 const diasAsistidos = new Set(entradas.map(r => r.date)).size;
-                const diasAusentes = workDaysPassed - diasAsistidos;
-                const porcentajeAsistencia = workDaysPassed > 0 
-                    ? ((diasAsistidos / workDaysPassed) * 100).toFixed(1) 
-                    : 0;
-                
+                const porcentajeAsistencia = workDaysPassed > 0 ? ((diasAsistidos / workDaysPassed) * 100).toFixed(1) : 0;
                 const puntuales = entradas.filter(r => r.punctualityStatus === 'PUNTUAL').length;
                 const retardos = entradas.filter(r => r.punctualityStatus === 'RETARDO').length;
                 const faltasImpuntualidad = entradas.filter(r => r.punctualityStatus === 'FALTA POR IMPUNTUALIDAD').length;
                 const conUniforme = entradas.filter(r => r.uniformComplete === true).length;
                 const sinUniforme = entradas.filter(r => r.uniformComplete === false).length;
-                
                 studentStats[student.code] = {
                     name: student.name,
                     diasAsistidos: diasAsistidos,
-                    diasAusentes: diasAusentes,
                     porcentajeAsistencia: porcentajeAsistencia,
-                    totalRegistros: studentRecords.length,
                     puntuales: puntuales,
                     retardos: retardos,
                     faltasImpuntualidad: faltasImpuntualidad,
@@ -2169,64 +2108,29 @@
                     sinUniforme: sinUniforme
                 };
             });
-            
-            const sortedStudents = Object.entries(studentStats).sort((a, b) => 
-                parseFloat(b[1].porcentajeAsistencia) - parseFloat(a[1].porcentajeAsistencia)
-            );
-            
+            const sortedStudents = Object.entries(studentStats).sort((a, b) => parseFloat(b[1].porcentajeAsistencia) - parseFloat(a[1].porcentajeAsistencia));
             document.getElementById('weeklyReport').innerHTML = `
                 <h3>Reporte Detallado por Alumno (Solo Días Hábiles: Lunes a Viernes)</h3>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Alumno</th>
-                            <th>Código</th>
-                            <th>Días Asistidos</th>
-                            <th>Puntuales</th>
-                            <th>Retardos</th>
-                            <th>Faltas Impunt.</th>
-                            <th>Con Uniforme</th>
-                            <th>Sin Uniforme</th>
-                            <th>% Asistencia</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${sortedStudents.map(([code, stats]) => {
-                            const percentage = parseFloat(stats.porcentajeAsistencia);
-                            let rowColor = '';
-                            if (percentage >= 90 && stats.retardos === 0 && stats.faltasImpuntualidad === 0) rowColor = 'background: #d4edda;';
-                            else if (percentage >= 70) rowColor = 'background: #fff3cd;';
-                            else if (percentage < 70 && workDaysPassed > 0) rowColor = 'background: #f8d7da;';
-                            
-                            return `
-                                <tr style="${rowColor}">
-                                    <td><strong>${stats.name}</strong></td>
-                                    <td>${code}</td>
-                                    <td>${stats.diasAsistidos} / ${workDaysPassed}</td>
-                                    <td>✅ ${stats.puntuales}</td>
-                                    <td>⚠️ ${stats.retardos}</td>
-                                    <td>❌ ${stats.faltasImpuntualidad}</td>
-                                    <td>👔 ${stats.conUniforme}</td>
-                                    <td>⚠️ ${stats.sinUniforme}</td>
-                                    <td><strong>${stats.porcentajeAsistencia}%</strong></td>
-                                </tr>
-                            `;
-                        }).join('')}
-                    </tbody>
-                </table>
-                <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                <table><thead><tr><th>Alumno</th><th>Código</th><th>Días Asistidos</th><th>Puntuales</th><th>Retardos</th><th>Faltas Impunt.</th><th>Con Uniforme</th><th>Sin Uniforme</th><th>% Asistencia</th></tr></thead>
+                <tbody>${sortedStudents.map(([code, stats]) => {
+                    const percentage = parseFloat(stats.porcentajeAsistencia);
+                    let rowColor = '';
+                    if (percentage >= 90 && stats.retardos === 0 && stats.faltasImpuntualidad === 0) rowColor = 'background: #d4edda;';
+                    else if (percentage >= 70) rowColor = 'background: #fff3cd;';
+                    else if (percentage < 70 && workDaysPassed > 0) rowColor = 'background: #f8d7da;';
+                    return `<tr style="${rowColor}"><td><strong>${stats.name}</strong></td><td>${code}</td><td>${stats.diasAsistidos} / ${workDaysPassed}</td><td>✅ ${stats.puntuales}</td><td>⚠️ ${stats.retardos}</td><td>❌ ${stats.faltasImpuntualidad}</td><td>👔 ${stats.conUniforme}</td><td>⚠️ ${stats.sinUniforme}</td><td><strong>${stats.porcentajeAsistencia}%</strong></td></tr>`;
+                }).join('')}</tbody></table>
+                <div style="margin-top:20px;padding:15px;background:#f8f9fa;border-radius:8px;">
                     <h4>Leyenda de Colores:</h4>
-                    <p><span style="display: inline-block; width: 20px; height: 20px; background: #d4edda; border: 1px solid #c3e6cb; vertical-align: middle;"></span> <strong>Verde:</strong> ≥ 90% de asistencia sin retardos ni faltas (Excelente)</p>
-                    <p><span style="display: inline-block; width: 20px; height: 20px; background: #fff3cd; border: 1px solid #ffeeba; vertical-align: middle;"></span> <strong>Amarillo:</strong> 70% - 89% de asistencia (Regular)</p>
-                    <p><span style="display: inline-block; width: 20px; height: 20px; background: #f8d7da; border: 1px solid #f5c6cb; vertical-align: middle;"></span> <strong>Rojo:</strong> < 70% de asistencia (Requiere atención)</p>
-                    <br>
-                    <h4>Estados de Puntualidad:</h4>
+                    <p><span style="display:inline-block;width:20px;height:20px;background:#d4edda;border:1px solid #c3e6cb;vertical-align:middle;"></span> <strong>Verde:</strong> ≥ 90% de asistencia sin retardos ni faltas (Excelente)</p>
+                    <p><span style="display:inline-block;width:20px;height:20px;background:#fff3cd;border:1px solid #ffeeba;vertical-align:middle;"></span> <strong>Amarillo:</strong> 70% - 89% de asistencia (Regular)</p>
+                    <p><span style="display:inline-block;width:20px;height:20px;background:#f8d7da;border:1px solid #f5c6cb;vertical-align:middle;"></span> <strong>Rojo:</strong> < 70% de asistencia (Requiere atención)</p>
+                    <br><h4>Estados de Puntualidad:</h4>
                     <p>✅ <strong>PUNTUAL:</strong> Entrada entre 6:30 AM y 7:00 AM</p>
                     <p>⚠️ <strong>RETARDO:</strong> Entrada entre 7:00 AM y 7:05 AM</p>
                     <p>❌ <strong>FALTA POR IMPUNTUALIDAD:</strong> Entrada después de las 7:05 AM</p>
                     <p>🕐 <strong>ENTRADA ANTICIPADA:</strong> Entrada antes de las 6:30 AM</p>
-                    <br>
-                    <h4>Control de Uniforme:</h4>
+                    <br><h4>Control de Uniforme:</h4>
                     <p>👔 <strong>Con Uniforme:</strong> Número de días que asistió con uniforme completo</p>
                     <p>⚠️ <strong>Sin Uniforme:</strong> Número de días que asistió sin uniforme completo</p>
                 </div>
