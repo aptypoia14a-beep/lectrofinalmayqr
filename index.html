@@ -80,6 +80,36 @@
             border-color: #f44336;
         }
 
+        
+        .sync-indicator {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #4caf50;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-weight: bold;
+            z-index: 10000;
+            display: none;
+            animation: fadeInOut 2s;
+        }
+
+        .sync-indicator.syncing {
+            background: #ff9800;
+            display: block;
+        }
+
+        .sync-indicator.error {
+            background: #f44336;
+            display: block;
+        }
+
+        @keyframes fadeInOut {
+            0%, 100% { opacity: 0; }
+            10%, 90% { opacity: 1; }
+        }
+
         .cloud-status.syncing {
             background: #fff3e0;
             border-color: #ff9800;
@@ -739,6 +769,8 @@
     </style>
 </head>
 <body>
+    <div id="syncIndicator" class="sync-indicator">🔄 Sincronizando...</div>
+
     <div id="uniformModal" class="modal-overlay">
         <div class="modal-content">
             <h2>👔 Verificación de Uniforme</h2>
@@ -809,6 +841,7 @@
             <div class="actions">
                 <button class="btn btn-success" onclick="saveConfig()">💾 Guardar Configuración</button>
                 <button class="btn btn-primary" onclick="testConnection()">🔌 Probar Conexión</button>
+                <button class="btn btn-primary" onclick="manualSync()">🔄 Sincronizar Ahora</button>
                 <button class="btn btn-primary" onclick="syncToCloud()">☁️ Sincronizar Todo a la Nube</button>
                 <button class="btn btn-primary" onclick="loadFromCloud()">⬇️ Cargar Datos desde la Nube</button>
             </div>
@@ -1037,10 +1070,11 @@
             setTodayDate();
             setupManualInput();
             setupBluetoothReader();
-            updateCloudStatus();
             updateBackupInfo();
             setMode('bluetooth');
             setIncidentDate();
+            autoSyncOnStart();
+            startAutoSync();
         };
 
         function showUniformModal(student, recordData) {
@@ -1358,10 +1392,10 @@
             const statusDiv = document.getElementById('cloudStatus');
             if (isCloudConnected) {
                 statusDiv.className = 'cloud-status';
-                statusDiv.innerHTML = '✅ Conectado a Google Sheets - Los datos se sincronizan automáticamente';
+                statusDiv.innerHTML = '✅ Conectado a Google Sheets - Sincronización automática activa (cada 30 seg)';
             } else {
                 statusDiv.className = 'cloud-status disconnected';
-                statusDiv.innerHTML = '⚠️ No conectado a Google Sheets - Usando almacenamiento local';
+                statusDiv.innerHTML = '⚠️ No conectado a Google Sheets - Configure la URL en Configuración';
             }
         }
 
@@ -1994,6 +2028,8 @@
                 .incident.uniforme{border-left:4px solid #ffc107}.incident strong{display:block;margin-bottom:5px}
                 .incident small{color:#666}.footer{margin-top:40px;padding-top:20px;border-top:2px solid #e0e0e0;text-align:center;color:#666;font-size:12px}
             </style></head><body>
+    <div id="syncIndicator" class="sync-indicator">🔄 Sincronizando...</div>
+
                 <div class="header">
                     <h1>COLEGIO LEONARD EULERD</h1>
                     <h2>Reporte de Incidencias del Día</h2>
@@ -2150,6 +2186,93 @@
             const parts = dateString.split('/');
             return new Date(parts[2], parts[1] - 1, parts[0]);
         }
+
+        // ========== FUNCIONES DE SINCRONIZACIÓN AUTOMÁTICA ==========
+        
+        async function autoSyncOnStart() {
+            webAppUrl = localStorage.getItem('webAppUrl') || '';
+            if (!webAppUrl) { updateCloudStatus(); return; }
+            try {
+                showSyncIndicator('syncing');
+                const response = await fetch(webAppUrl + '?action=getStudents');
+                const data = await response.json();
+                if (data.success) {
+                    isCloudConnected = true;
+                    await syncFromCloud();
+                    showSyncIndicator('success');
+                    updateCloudStatus();
+                } else {
+                    isCloudConnected = false;
+                    updateCloudStatus();
+                }
+            } catch (error) {
+                isCloudConnected = false;
+                console.error('Error sincronización:', error);
+                updateCloudStatus();
+            }
+        }
+
+        async function syncFromCloud() {
+            if (!webAppUrl || !isCloudConnected) return;
+            try {
+                showSyncIndicator('syncing');
+                const studentsResponse = await fetch(webAppUrl + '?action=getStudents');
+                const studentsData = await studentsResponse.json();
+                if (studentsData.success && studentsData.students) students = studentsData.students;
+                const recordsResponse = await fetch(webAppUrl + '?action=getRecords');
+                const recordsData = await recordsResponse.json();
+                if (recordsData.success && recordsData.records) attendanceRecords = recordsData.records;
+                saveData();
+                displayStudents();
+                displayRecords();
+                updateBackupInfo();
+                showSyncIndicator('success');
+                console.log('✅ Sincronizado:', {alumnos: students.length, registros: attendanceRecords.length});
+            } catch (error) {
+                console.error('❌ Error sincronización:', error);
+                showSyncIndicator('error');
+            }
+        }
+
+        function startAutoSync() {
+            setInterval(async () => {
+                if (isCloudConnected && webAppUrl) {
+                    console.log('🔄 Sincronización automática...');
+                    await syncFromCloud();
+                }
+            }, 30000);
+        }
+
+        function showSyncIndicator(status) {
+            const indicator = document.getElementById('syncIndicator');
+            indicator.className = 'sync-indicator';
+            if (status === 'syncing') {
+                indicator.className = 'sync-indicator syncing';
+                indicator.textContent = '🔄 Sincronizando...';
+            } else if (status === 'success') {
+                indicator.className = 'sync-indicator';
+                indicator.style.background = '#4caf50';
+                indicator.style.display = 'block';
+                indicator.textContent = '✅ Sincronizado';
+                setTimeout(() => { indicator.style.display = 'none'; }, 2000);
+            } else if (status === 'error') {
+                indicator.className = 'sync-indicator error';
+                indicator.textContent = '❌ Error sincronización';
+                setTimeout(() => { indicator.style.display = 'none'; }, 3000);
+            }
+        }
+
+        async function manualSync() {
+            if (!isCloudConnected || !webAppUrl) {
+                alert('❌ No conectado. Configure URL en Configuración.');
+                return;
+            }
+            showConfigStatus('🔄 Sincronizando...', 'info');
+            await syncFromCloud();
+            showConfigStatus('✅ Sincronización completada', 'success');
+        }
+
     </script>
 </body>
 </html>
+
