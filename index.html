@@ -1746,6 +1746,7 @@
         }
 
         function displayRecords() {
+            console.log('📊 Mostrando registros. Total en memoria:', attendanceRecords.length);
             const container = document.getElementById('recordsTable');
             const filterDate = document.getElementById('filterDate').value;
             let filtered = attendanceRecords;
@@ -1836,12 +1837,11 @@
         }
 
         async function filterRecords() {
+            console.log('🔍 Filtrando registros...');
             if (isCloudConnected) {
-                showSyncIndicator('syncing');
-                await syncFromCloud();
-                showSyncIndicator('success');
+                await syncAndWait(); // Sincronizar y esperar
             }
-            displayRecords();
+            displayRecords(); // Mostrar con datos actualizados
         }
 
         function clearRecords() {
@@ -1853,11 +1853,10 @@
         }
 
         async function exportToCSV() {
-            // NUEVO: Sincronizar desde la nube antes de exportar
+            // Sincronizar desde la nube antes de exportar
+            console.log('📥 Exportando a CSV...');
             if (isCloudConnected) {
-                showSyncIndicator('syncing');
-                await syncFromCloud();
-                showSyncIndicator('success');
+                await syncAndWait(); // Sincronizar y esperar
             }
             
             if (attendanceRecords.length === 0) {
@@ -1921,6 +1920,7 @@
                 alert('⚠️ La fecha seleccionada es fin de semana. Por favor seleccione un día hábil (lunes a viernes).');
                 return;
             }
+            console.log('📊 Generando reporte de incidencias. Registros disponibles:', attendanceRecords.length);
             const dayRecords = attendanceRecords.filter(r => r.date === dateStr);
             if (dayRecords.length === 0) {
                 alert('No hay registros para la fecha seleccionada');
@@ -2125,6 +2125,7 @@
                     }
                 }
             }
+            console.log('📊 Generando reporte semanal. Registros disponibles:', attendanceRecords.length);
             const weekRecords = attendanceRecords.filter(record => {
                 const recordDate = parseDate(record.date);
                 const dayOfWeek = recordDate.getDay();
@@ -2209,6 +2210,54 @@
             return new Date(parts[2], parts[1] - 1, parts[0]);
         }
 
+
+        // NUEVA FUNCIÓN: Sincronizar y esperar a que termine
+        async function syncAndWait() {
+            if (!isCloudConnected || !webAppUrl) {
+                console.warn('⚠️ No conectado a Google Sheets, usando datos locales');
+                return false;
+            }
+            
+            try {
+                showSyncIndicator('syncing');
+                console.log('🔄 Iniciando sincronización...');
+                
+                // DESCARGAR ALUMNOS
+                const studentsResponse = await fetch(webAppUrl + '?action=getStudents');
+                const studentsData = await studentsResponse.json();
+                
+                if (studentsData.success && studentsData.students) {
+                    students = studentsData.students;
+                    console.log('✅ Alumnos actualizados:', students.length);
+                } else {
+                    console.error('❌ Error al obtener alumnos:', studentsData);
+                }
+                
+                // DESCARGAR REGISTROS
+                const recordsResponse = await fetch(webAppUrl + '?action=getRecords');
+                const recordsData = await recordsResponse.json();
+                
+                if (recordsData.success && recordsData.records) {
+                    attendanceRecords = recordsData.records;
+                    console.log('✅ Registros actualizados:', attendanceRecords.length);
+                } else {
+                    console.error('❌ Error al obtener registros:', recordsData);
+                }
+                
+                // Guardar en localStorage
+                saveData();
+                
+                showSyncIndicator('success');
+                console.log('✅ Sincronización completada');
+                return true;
+                
+            } catch (error) {
+                console.error('❌ Error en sincronización:', error);
+                showSyncIndicator('error');
+                return false;
+            }
+        }
+
         // ========== FUNCIONES DE SINCRONIZACIÓN AUTOMÁTICA ==========
         
         async function autoSyncOnStart() {
@@ -2238,20 +2287,38 @@
             if (!webAppUrl || !isCloudConnected) return;
             try {
                 showSyncIndicator('syncing');
+                
+                // DESCARGAR ALUMNOS desde Google Sheets
                 const studentsResponse = await fetch(webAppUrl + '?action=getStudents');
                 const studentsData = await studentsResponse.json();
-                if (studentsData.success && studentsData.students) students = studentsData.students;
+                
+                // FORZAR actualización de la variable students
+                if (studentsData.success && studentsData.students) {
+                    students = []; // LIMPIAR primero
+                    students = studentsData.students; // CARGAR desde nube
+                    console.log('📥 Alumnos descargados:', students.length);
+                }
+                
+                // DESCARGAR REGISTROS desde Google Sheets
                 const recordsResponse = await fetch(webAppUrl + '?action=getRecords');
                 const recordsData = await recordsResponse.json();
-                if (recordsData.success && recordsData.records) attendanceRecords = recordsData.records;
+                
+                // FORZAR actualización de la variable attendanceRecords
+                if (recordsData.success && recordsData.records) {
+                    attendanceRecords = []; // LIMPIAR primero
+                    attendanceRecords = recordsData.records; // CARGAR desde nube
+                    console.log('📥 Registros descargados:', attendanceRecords.length);
+                }
+                
+                // GUARDAR en localStorage como respaldo
                 saveData();
-                displayStudents();
-                displayRecords();
-                updateBackupInfo();
+                
+                // NO actualizar vistas aquí - se hace en cada función
                 showSyncIndicator('success');
-                console.log('✅ Sincronizado:', {alumnos: students.length, registros: attendanceRecords.length});
+                console.log('✅ Sincronización completada desde Google Sheets');
+                
             } catch (error) {
-                console.error('❌ Error sincronización:', error);
+                console.error('❌ Error en sincronización:', error);
                 showSyncIndicator('error');
             }
         }
@@ -2297,5 +2364,3 @@
     </script>
 </body>
 </html>
-
-
