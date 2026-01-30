@@ -995,6 +995,11 @@
         <!-- TAB: REGISTROS -->
         <div id="records" class="tab-content">
             <h2>Registros de Asistencia</h2>
+            <div style="background: #e3f2fd; padding: 15px; border-radius: 10px; margin-bottom: 20px; text-align: center; border: 2px solid #0A6EB4;">
+                <p style="margin: 0; color: #0A6EB4; font-weight: bold;">
+                    ☁️ Los registros se cargan automáticamente desde Google Sheets
+                </p>
+            </div>
             
             <div class="form-group">
                 <label>Filtrar por Fecha:</label>
@@ -1012,6 +1017,11 @@
         <!-- TAB: REPORTES -->
         <div id="reports" class="tab-content">
             <h2>Reportes y Estadísticas</h2>
+            <div style="background: #e3f2fd; padding: 15px; border-radius: 10px; margin-bottom: 20px; text-align: center; border: 2px solid #0A6EB4;">
+                <p style="margin: 0; color: #0A6EB4; font-weight: bold;">
+                    ☁️ Los reportes se generan con datos actualizados desde Google Sheets
+                </p>
+            </div>
             
             <!-- NUEVO: Reporte de Incidencias del Día -->
             <div class="backup-section" style="background: #fff3e0; border-color: #ff9800;">
@@ -1039,7 +1049,7 @@
             
             <div class="form-group">
                 <label>Seleccionar Semana:</label>
-                <input type="week" id="weekSelect" onchange="generateWeeklyReport()">
+                <input type="week" id="weekSelect" onchange="generateWeeklyReport()" onclick="generateWeeklyReport()">
             </div>
             
             <div class="stats-grid" id="statsGrid"></div>
@@ -1825,7 +1835,12 @@
             `;
         }
 
-        function filterRecords() {
+        async function filterRecords() {
+            if (isCloudConnected) {
+                showSyncIndicator('syncing');
+                await syncFromCloud();
+                showSyncIndicator('success');
+            }
             displayRecords();
         }
 
@@ -1837,7 +1852,14 @@
             }
         }
 
-        function exportToCSV() {
+        async function exportToCSV() {
+            // NUEVO: Sincronizar desde la nube antes de exportar
+            if (isCloudConnected) {
+                showSyncIndicator('syncing');
+                await syncFromCloud();
+                showSyncIndicator('success');
+            }
+            
             if (attendanceRecords.length === 0) {
                 alert('No hay registros para exportar');
                 return;
@@ -2275,4 +2297,5 @@
     </script>
 </body>
 </html>
+
 
