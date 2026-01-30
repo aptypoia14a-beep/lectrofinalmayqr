@@ -786,8 +786,8 @@
         let isCloudConnected = false;
         let html5QrCode = null;
         let isCameraActive = false;
-        let currentMode = 'bluetooth'; // Modo por defecto: Lector Bluetooth
-        let scanBuffer = ''; // Buffer para acumular caracteres del lector
+        let currentMode = 'bluetooth';
+        let scanBuffer = '';
         let scanTimeout = null;
 
         window.onload = function() {
@@ -800,7 +800,7 @@
             setupBluetoothReader();
             updateCloudStatus();
             updateBackupInfo();
-            setMode('bluetooth'); // Iniciar en modo Bluetooth
+            setMode('bluetooth');
         };
 
         // ========== FUNCIONES DEL LECTOR BLUETOOTH ==========
@@ -808,7 +808,6 @@
         function setupBluetoothReader() {
             const bluetoothInput = document.getElementById('bluetoothInput');
             
-            // Evento cuando se presiona Enter (el lector envía Enter al final)
             bluetoothInput.addEventListener('keypress', function(e) {
                 if (e.key === 'Enter') {
                     e.preventDefault();
@@ -816,7 +815,6 @@
                     if (code) {
                         processCode(code);
                         bluetoothInput.value = '';
-                        // Animación visual
                         bluetoothInput.classList.add('scan-animation');
                         setTimeout(() => {
                             bluetoothInput.classList.remove('scan-animation');
@@ -825,21 +823,17 @@
                 }
             });
 
-            // Auto-focus cuando se hace clic en el campo
             bluetoothInput.addEventListener('click', function() {
                 this.focus();
                 updateReaderStatus(true);
             });
 
-            // Detectar cuando pierde el foco
             bluetoothInput.addEventListener('blur', function() {
                 updateReaderStatus(false);
             });
 
-            // Mantener el foco en el campo cuando está en modo bluetooth
             document.addEventListener('click', function(e) {
                 if (currentMode === 'bluetooth' && e.target.id !== 'bluetoothInput') {
-                    // Re-enfocar el campo si no se está haciendo clic en otro input o botón
                     if (!e.target.matches('input, button, select, a')) {
                         setTimeout(() => {
                             document.getElementById('bluetoothInput').focus();
@@ -863,25 +857,21 @@
         // ========== SELECTOR DE MODO ==========
 
         function setMode(mode) {
-            // Detener cámara si está activa
             if (isCameraActive) {
                 stopCamera();
             }
 
             currentMode = mode;
 
-            // Actualizar botones de modo
             document.querySelectorAll('.mode-btn').forEach(btn => {
                 btn.classList.remove('active');
             });
             event.target.classList.add('active');
 
-            // Mostrar/ocultar secciones según el modo
             document.getElementById('bluetoothMode').style.display = mode === 'bluetooth' ? 'block' : 'none';
             document.getElementById('cameraMode').style.display = mode === 'camera' ? 'block' : 'none';
             document.getElementById('manualMode').style.display = mode === 'manual' ? 'block' : 'none';
 
-            // Auto-focus según el modo
             if (mode === 'bluetooth') {
                 setTimeout(() => {
                     document.getElementById('bluetoothInput').focus();
@@ -912,7 +902,7 @@
             };
 
             html5QrCode.start(
-                { facingMode: "environment" }, // Cámara trasera (cambiar a "user" para frontal)
+                { facingMode: "environment" },
                 config,
                 onScanSuccess,
                 onScanError
@@ -947,7 +937,6 @@
         }
 
         function onScanError(errorMessage) {
-            // Los errores de escaneo son normales cuando no hay código en la vista
         }
 
         function updateCameraStatus(active) {
@@ -1324,7 +1313,6 @@
             } else if (tabName === 'config') {
                 updateBackupInfo();
             } else if (tabName === 'scanner' && currentMode === 'bluetooth') {
-                // Re-enfocar el campo del lector Bluetooth
                 setTimeout(() => {
                     document.getElementById('bluetoothInput').focus();
                 }, 100);
@@ -1353,7 +1341,6 @@
             const now = new Date();
             const todayDate = now.toLocaleDateString('es-MX');
             
-            // Verificar si ya existe un registro del mismo tipo para este alumno hoy
             const existingRecord = attendanceRecords.find(r => 
                 r.studentCode === code && 
                 r.date === todayDate && 
@@ -1361,26 +1348,53 @@
             );
             
             if (existingRecord) {
-                // Ya existe un registro del mismo tipo hoy
                 const icon = recordType === 'entrada' ? '⚠️' : '⚠️';
                 const typeText = recordType === 'entrada' ? 'ENTRADA' : 'SALIDA';
                 showStatus(
                     `${icon} ${student.name} ya registró su ${typeText} hoy<br>` +
                     `<strong>Hora del primer registro: ${existingRecord.time}</strong><br>` +
+                    `<strong>Estado: ${existingRecord.punctualityStatus || 'N/A'}</strong><br>` +
                     `No se registrará nuevamente`,
                     'info'
                 );
                 return;
             }
             
-            // No existe registro previo, proceder a registrar
+            let punctualityStatus = '';
+            let punctualityIcon = '';
+            
+            if (recordType === 'entrada') {
+                const hours = now.getHours();
+                const minutes = now.getMinutes();
+                const totalMinutes = hours * 60 + minutes;
+                
+                const time_6_30 = 6 * 60 + 30;
+                const time_7_00 = 7 * 60;
+                const time_7_05 = 7 * 60 + 5;
+                
+                if (totalMinutes >= time_6_30 && totalMinutes < time_7_00) {
+                    punctualityStatus = 'PUNTUAL';
+                    punctualityIcon = '✅';
+                } else if (totalMinutes >= time_7_00 && totalMinutes < time_7_05) {
+                    punctualityStatus = 'RETARDO';
+                    punctualityIcon = '⚠️';
+                } else if (totalMinutes >= time_7_05) {
+                    punctualityStatus = 'FALTA POR IMPUNTUALIDAD';
+                    punctualityIcon = '❌';
+                } else {
+                    punctualityStatus = 'ENTRADA ANTICIPADA';
+                    punctualityIcon = '🕐';
+                }
+            }
+            
             const record = {
                 studentCode: code,
                 studentName: student.name,
                 type: recordType,
                 date: todayDate,
                 time: now.toLocaleTimeString('es-MX'),
-                timestamp: now.getTime()
+                timestamp: now.getTime(),
+                punctualityStatus: punctualityStatus
             };
             
             attendanceRecords.push(record);
@@ -1398,7 +1412,13 @@
             }
             
             const icon = recordType === 'entrada' ? '🟢' : '🔴';
-            showStatus(`${icon} ${recordType.toUpperCase()} registrada: ${student.name} - ${record.time}`, 'success');
+            let statusMessage = `${icon} ${recordType.toUpperCase()} registrada: ${student.name} - ${record.time}`;
+            
+            if (punctualityStatus) {
+                statusMessage += `<br><strong>${punctualityIcon} ${punctualityStatus}</strong>`;
+            }
+            
+            showStatus(statusMessage, 'success');
         }
 
         function showStatus(message, type) {
@@ -1407,7 +1427,6 @@
             statusDiv.innerHTML = message;
             statusDiv.style.display = 'block';
             
-            // Tiempo más largo para mensajes de información (duplicados)
             const timeout = type === 'info' ? 5000 : 3000;
             
             setTimeout(() => {
@@ -1638,12 +1657,14 @@
                         date: record.date,
                         entrada: '',
                         salida: '',
+                        punctualityStatus: '',
                         timestamp: record.timestamp
                     };
                 }
                 
                 if (record.type === 'entrada') {
                     groupedRecords[key].entrada = record.time;
+                    groupedRecords[key].punctualityStatus = record.punctualityStatus || '';
                 } else if (record.type === 'salida') {
                     groupedRecords[key].salida = record.time;
                 }
@@ -1658,18 +1679,41 @@
                             <th>Fecha</th>
                             <th>Alumno</th>
                             <th>Hora de Entrada</th>
+                            <th>Estado</th>
                             <th>Hora de Salida</th>
                         </tr>
                     </thead>
                     <tbody>
-                        ${sortedRecords.map(record => `
-                            <tr>
-                                <td>${record.date}</td>
-                                <td><strong>${record.studentName}</strong></td>
-                                <td>${record.entrada || '<span style="color: #999;">-</span>'}</td>
-                                <td>${record.salida || '<span style="color: #999;">-</span>'}</td>
-                            </tr>
-                        `).join('')}
+                        ${sortedRecords.map(record => {
+                            let statusCell = '<span style="color: #999;">-</span>';
+                            let statusColor = '';
+                            
+                            if (record.punctualityStatus) {
+                                if (record.punctualityStatus === 'PUNTUAL') {
+                                    statusCell = '<span style="color: #28a745; font-weight: bold;">✅ PUNTUAL</span>';
+                                    statusColor = 'background: #d4edda;';
+                                } else if (record.punctualityStatus === 'RETARDO') {
+                                    statusCell = '<span style="color: #ff9800; font-weight: bold;">⚠️ RETARDO</span>';
+                                    statusColor = 'background: #fff3cd;';
+                                } else if (record.punctualityStatus === 'FALTA POR IMPUNTUALIDAD') {
+                                    statusCell = '<span style="color: #dc3545; font-weight: bold;">❌ FALTA</span>';
+                                    statusColor = 'background: #f8d7da;';
+                                } else if (record.punctualityStatus === 'ENTRADA ANTICIPADA') {
+                                    statusCell = '<span style="color: #0A6EB4; font-weight: bold;">🕐 ANTICIPADA</span>';
+                                    statusColor = 'background: #d1ecf1;';
+                                }
+                            }
+                            
+                            return `
+                                <tr style="${statusColor}">
+                                    <td>${record.date}</td>
+                                    <td><strong>${record.studentName}</strong></td>
+                                    <td>${record.entrada || '<span style="color: #999;">-</span>'}</td>
+                                    <td>${statusCell}</td>
+                                    <td>${record.salida || '<span style="color: #999;">-</span>'}</td>
+                                </tr>
+                            `;
+                        }).join('')}
                     </tbody>
                 </table>
             `;
@@ -1703,20 +1747,23 @@
                         studentName: record.studentName,
                         date: record.date,
                         entrada: '',
-                        salida: ''
+                        salida: '',
+                        punctualityStatus: ''
                     };
                 }
                 
                 if (record.type === 'entrada') {
                     groupedRecords[key].entrada = record.time;
+                    groupedRecords[key].punctualityStatus = record.punctualityStatus || '';
                 } else if (record.type === 'salida') {
                     groupedRecords[key].salida = record.time;
                 }
             });
             
-            let csv = 'Fecha,Alumno,Hora de Entrada,Hora de Salida\n';
+            let csv = 'Fecha,Alumno,Hora de Entrada,Estado,Hora de Salida\n';
             Object.values(groupedRecords).forEach(record => {
-                csv += `${record.date},${record.studentName},${record.entrada},${record.salida}\n`;
+                const status = record.punctualityStatus || '';
+                csv += `${record.date},${record.studentName},${record.entrada},${status},${record.salida}\n`;
             });
             
             const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -1744,7 +1791,6 @@
             const today = new Date();
             today.setHours(0, 0, 0, 0);
             
-            // Calcular días hábiles (lunes a viernes) que ya han transcurrido
             let workDaysInWeek = 0;
             let workDaysPassed = 0;
             const workDaysList = [];
@@ -1754,24 +1800,20 @@
                 currentDay.setDate(weekStart.getDate() + i);
                 const dayOfWeek = currentDay.getDay();
                 
-                // Solo contar lunes (1) a viernes (5)
                 if (dayOfWeek >= 1 && dayOfWeek <= 5) {
                     workDaysInWeek++;
                     workDaysList.push(new Date(currentDay));
                     
-                    // Contar solo si el día ya ha pasado
                     if (currentDay <= today) {
                         workDaysPassed++;
                     }
                 }
             }
             
-            // Filtrar registros solo de días hábiles (lunes a viernes)
             const weekRecords = attendanceRecords.filter(record => {
                 const recordDate = parseDate(record.date);
                 const dayOfWeek = recordDate.getDay();
                 
-                // Verificar que esté en el rango de la semana, sea día hábil y ya haya pasado
                 return recordDate >= weekStart && 
                        recordDate <= weekEnd && 
                        dayOfWeek >= 1 && 
@@ -1784,7 +1826,6 @@
             const totalSalidas = weekRecords.filter(r => r.type === 'salida').length;
             const alumnosUnicos = new Set(weekRecords.map(r => r.studentCode)).size;
             
-            // Información de la semana
             const weekInfo = workDaysPassed < workDaysInWeek 
                 ? `<p style="background: #fff3e0; padding: 15px; border-radius: 8px; text-align: center; margin: 20px 0; border: 2px solid #ff9800;">
                      ⚠️ <strong>Semana en curso:</strong> Se han contabilizado ${workDaysPassed} de ${workDaysInWeek} días hábiles (lunes a viernes)
@@ -1816,29 +1857,33 @@
                 </div>
             `;
             
-            // Calcular estadísticas por alumno
             const studentStats = {};
             students.forEach(student => {
                 const studentRecords = weekRecords.filter(r => r.studentCode === student.code);
                 const entradas = studentRecords.filter(r => r.type === 'entrada');
                 
-                // Contar solo los días hábiles únicos que el alumno asistió
                 const diasAsistidos = new Set(entradas.map(r => r.date)).size;
                 const diasAusentes = workDaysPassed - diasAsistidos;
                 const porcentajeAsistencia = workDaysPassed > 0 
                     ? ((diasAsistidos / workDaysPassed) * 100).toFixed(1) 
                     : 0;
                 
+                const puntuales = entradas.filter(r => r.punctualityStatus === 'PUNTUAL').length;
+                const retardos = entradas.filter(r => r.punctualityStatus === 'RETARDO').length;
+                const faltasImpuntualidad = entradas.filter(r => r.punctualityStatus === 'FALTA POR IMPUNTUALIDAD').length;
+                
                 studentStats[student.code] = {
                     name: student.name,
                     diasAsistidos: diasAsistidos,
                     diasAusentes: diasAusentes,
                     porcentajeAsistencia: porcentajeAsistencia,
-                    totalRegistros: studentRecords.length
+                    totalRegistros: studentRecords.length,
+                    puntuales: puntuales,
+                    retardos: retardos,
+                    faltasImpuntualidad: faltasImpuntualidad
                 };
             });
             
-            // Ordenar por porcentaje de asistencia (mayor a menor)
             const sortedStudents = Object.entries(studentStats).sort((a, b) => 
                 parseFloat(b[1].porcentajeAsistencia) - parseFloat(a[1].porcentajeAsistencia)
             );
@@ -1851,16 +1896,17 @@
                             <th>Alumno</th>
                             <th>Código</th>
                             <th>Días Asistidos</th>
-                            <th>Días Ausentes</th>
+                            <th>Puntuales</th>
+                            <th>Retardos</th>
+                            <th>Faltas Impunt.</th>
                             <th>% Asistencia</th>
-                            <th>Total Registros</th>
                         </tr>
                     </thead>
                     <tbody>
                         ${sortedStudents.map(([code, stats]) => {
                             const percentage = parseFloat(stats.porcentajeAsistencia);
                             let rowColor = '';
-                            if (percentage >= 90) rowColor = 'background: #d4edda;';
+                            if (percentage >= 90 && stats.retardos === 0 && stats.faltasImpuntualidad === 0) rowColor = 'background: #d4edda;';
                             else if (percentage >= 70) rowColor = 'background: #fff3cd;';
                             else if (percentage < 70 && workDaysPassed > 0) rowColor = 'background: #f8d7da;';
                             
@@ -1869,9 +1915,10 @@
                                     <td><strong>${stats.name}</strong></td>
                                     <td>${code}</td>
                                     <td>${stats.diasAsistidos} / ${workDaysPassed}</td>
-                                    <td>${stats.diasAusentes}</td>
+                                    <td>✅ ${stats.puntuales}</td>
+                                    <td>⚠️ ${stats.retardos}</td>
+                                    <td>❌ ${stats.faltasImpuntualidad}</td>
                                     <td><strong>${stats.porcentajeAsistencia}%</strong></td>
-                                    <td>${stats.totalRegistros}</td>
                                 </tr>
                             `;
                         }).join('')}
@@ -1879,9 +1926,15 @@
                 </table>
                 <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
                     <h4>Leyenda de Colores:</h4>
-                    <p><span style="display: inline-block; width: 20px; height: 20px; background: #d4edda; border: 1px solid #c3e6cb; vertical-align: middle;"></span> <strong>Verde:</strong> ≥ 90% de asistencia (Excelente)</p>
+                    <p><span style="display: inline-block; width: 20px; height: 20px; background: #d4edda; border: 1px solid #c3e6cb; vertical-align: middle;"></span> <strong>Verde:</strong> ≥ 90% de asistencia sin retardos ni faltas (Excelente)</p>
                     <p><span style="display: inline-block; width: 20px; height: 20px; background: #fff3cd; border: 1px solid #ffeeba; vertical-align: middle;"></span> <strong>Amarillo:</strong> 70% - 89% de asistencia (Regular)</p>
                     <p><span style="display: inline-block; width: 20px; height: 20px; background: #f8d7da; border: 1px solid #f5c6cb; vertical-align: middle;"></span> <strong>Rojo:</strong> < 70% de asistencia (Requiere atención)</p>
+                    <br>
+                    <h4>Estados de Puntualidad:</h4>
+                    <p>✅ <strong>PUNTUAL:</strong> Entrada entre 6:30 AM y 7:00 AM</p>
+                    <p>⚠️ <strong>RETARDO:</strong> Entrada entre 7:00 AM y 7:05 AM</p>
+                    <p>❌ <strong>FALTA POR IMPUNTUALIDAD:</strong> Entrada después de las 7:05 AM</p>
+                    <p>🕐 <strong>ENTRADA ANTICIPADA:</strong> Entrada antes de las 6:30 AM</p>
                 </div>
             `;
         }
