@@ -639,12 +639,6 @@
             box-shadow: 0 8px 20px rgba(40, 167, 69, 0.4);
         }
 
-        .btn-uniform-yes:disabled {
-            background: #6c757d;
-            cursor: not-allowed;
-            transform: none;
-        }
-
         .btn-uniform-no {
             background: #dc3545;
             color: white;
@@ -661,12 +655,6 @@
             background: #c82333;
             transform: translateY(-3px);
             box-shadow: 0 8px 20px rgba(220, 53, 69, 0.4);
-        }
-
-        .btn-uniform-no:disabled {
-            background: #6c757d;
-            cursor: not-allowed;
-            transform: none;
         }
 
         /* Estilos específicos para móviles */
@@ -708,10 +696,10 @@
             <p class="uniform-question">¿Uniforme Completo?</p>
             
             <div class="modal-buttons">
-                <button class="btn-uniform-yes" id="btnUniformYes" onclick="confirmUniform(true)">
+                <button class="btn-uniform-yes" onclick="confirmUniform(true)">
                     ✅ SÍ
                 </button>
-                <button class="btn-uniform-no" id="btnUniformNo" onclick="confirmUniform(false)">
+                <button class="btn-uniform-no" onclick="confirmUniform(false)">
                     ❌ NO
                 </button>
             </div>
@@ -966,7 +954,6 @@
         
         // Variables para el modal de uniforme
         let pendingRecord = null;
-        let isProcessingUniform = false; // NUEVA VARIABLE para evitar duplicados
 
         window.onload = function() {
             loadData();
@@ -985,15 +972,10 @@
 
         function showUniformModal(student, recordData) {
             pendingRecord = recordData;
-            isProcessingUniform = false; // Resetear el flag al mostrar el modal
             
             document.getElementById('modalStudentName').textContent = student.name;
             document.getElementById('modalStudentCode').textContent = student.code;
             document.getElementById('modalTime').textContent = recordData.time;
-            
-            // Habilitar los botones
-            document.getElementById('btnUniformYes').disabled = false;
-            document.getElementById('btnUniformNo').disabled = false;
             
             document.getElementById('uniformModal').classList.add('active');
         }
@@ -1001,7 +983,6 @@
         function hideUniformModal() {
             document.getElementById('uniformModal').classList.remove('active');
             pendingRecord = null;
-            isProcessingUniform = false; // Resetear el flag al cerrar el modal
             
             // Reanudar el escaneo si estamos en modo cámara
             if (currentMode === 'camera' && html5QrCode && isCameraActive) {
@@ -1023,21 +1004,7 @@
         }
 
         async function confirmUniform(hasUniform) {
-            // Verificar si ya se está procesando para evitar duplicados
-            if (isProcessingUniform) {
-                console.log('Ya se está procesando el uniforme, ignorando clic duplicado');
-                return;
-            }
-            
-            if (!pendingRecord) {
-                console.log('No hay registro pendiente');
-                return;
-            }
-            
-            // Marcar como procesando y deshabilitar botones inmediatamente
-            isProcessingUniform = true;
-            document.getElementById('btnUniformYes').disabled = true;
-            document.getElementById('btnUniformNo').disabled = true;
+            if (!pendingRecord) return;
             
             // Agregar el estado de uniforme al registro
             pendingRecord.uniformComplete = hasUniform;
