@@ -541,9 +541,148 @@
             transform: translateY(-2px);
             box-shadow: 0 5px 15px rgba(10, 110, 180, 0.3);
         }
+
+        /* MODAL PARA VERIFICACIÓN DE UNIFORME */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            text-align: center;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            animation: modalFadeIn 0.3s ease;
+        }
+
+        @keyframes modalFadeIn {
+            from {
+                opacity: 0;
+                transform: scale(0.9);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .modal-content h2 {
+            color: #0A6EB4;
+            margin-bottom: 15px;
+            font-size: 2em;
+        }
+
+        .modal-content .student-info {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            border-left: 4px solid #0A6EB4;
+        }
+
+        .modal-content .student-info h3 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .modal-content .student-info p {
+            color: #666;
+            font-size: 16px;
+            margin: 5px 0;
+        }
+
+        .modal-content .uniform-question {
+            font-size: 1.5em;
+            color: #333;
+            margin: 30px 0 20px 0;
+            font-weight: bold;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin-top: 30px;
+        }
+
+        .btn-uniform-yes {
+            background: #28a745;
+            color: white;
+            padding: 20px 50px;
+            font-size: 1.3em;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+
+        .btn-uniform-yes:hover {
+            background: #218838;
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(40, 167, 69, 0.4);
+        }
+
+        .btn-uniform-no {
+            background: #dc3545;
+            color: white;
+            padding: 20px 50px;
+            font-size: 1.3em;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+
+        .btn-uniform-no:hover {
+            background: #c82333;
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(220, 53, 69, 0.4);
+        }
     </style>
 </head>
 <body>
+    <!-- MODAL DE VERIFICACIÓN DE UNIFORME -->
+    <div id="uniformModal" class="modal-overlay">
+        <div class="modal-content">
+            <h2>👔 Verificación de Uniforme</h2>
+            
+            <div class="student-info">
+                <h3 id="modalStudentName"></h3>
+                <p><strong>CURP:</strong> <span id="modalStudentCode"></span></p>
+                <p><strong>Hora:</strong> <span id="modalTime"></span></p>
+            </div>
+            
+            <p class="uniform-question">¿Uniforme Completo?</p>
+            
+            <div class="modal-buttons">
+                <button class="btn-uniform-yes" onclick="confirmUniform(true)">
+                    ✅ SÍ
+                </button>
+                <button class="btn-uniform-no" onclick="confirmUniform(false)">
+                    ❌ NO
+                </button>
+            </div>
+        </div>
+    </div>
+
     <div class="container">
         <div class="header">
             <div class="logo">
@@ -789,6 +928,9 @@
         let currentMode = 'bluetooth';
         let scanBuffer = '';
         let scanTimeout = null;
+        
+        // Variables para el modal de uniforme
+        let pendingRecord = null;
 
         window.onload = function() {
             loadData();
@@ -802,6 +944,71 @@
             updateBackupInfo();
             setMode('bluetooth');
         };
+
+        // ========== FUNCIONES DEL MODAL DE UNIFORME ==========
+
+        function showUniformModal(student, recordData) {
+            pendingRecord = recordData;
+            
+            document.getElementById('modalStudentName').textContent = student.name;
+            document.getElementById('modalStudentCode').textContent = student.code;
+            document.getElementById('modalTime').textContent = recordData.time;
+            
+            document.getElementById('uniformModal').classList.add('active');
+        }
+
+        function hideUniformModal() {
+            document.getElementById('uniformModal').classList.remove('active');
+            pendingRecord = null;
+            
+            // Volver a enfocar el campo de entrada según el modo
+            if (currentMode === 'bluetooth') {
+                setTimeout(() => {
+                    document.getElementById('bluetoothInput').focus();
+                }, 100);
+            } else if (currentMode === 'manual') {
+                setTimeout(() => {
+                    document.getElementById('manualCode').focus();
+                }, 100);
+            }
+        }
+
+        async function confirmUniform(hasUniform) {
+            if (!pendingRecord) return;
+            
+            // Agregar el estado de uniforme al registro
+            pendingRecord.uniformComplete = hasUniform;
+            
+            // Guardar el registro
+            attendanceRecords.push(pendingRecord);
+            saveData();
+            
+            // Guardar en la nube si está conectado
+            if (isCloudConnected) {
+                await saveToCloud('saveRecord', {
+                    action: 'saveRecord',
+                    record: pendingRecord
+                });
+            }
+            
+            // Mostrar mensaje de confirmación
+            const uniformIcon = hasUniform ? '✅' : '❌';
+            const uniformText = hasUniform ? 'CON UNIFORME' : 'SIN UNIFORME COMPLETO';
+            const punctualityIcon = pendingRecord.punctualityStatus ? 
+                (pendingRecord.punctualityStatus === 'PUNTUAL' ? '✅' : 
+                 pendingRecord.punctualityStatus === 'RETARDO' ? '⚠️' : '❌') : '';
+            
+            let statusMessage = `🟢 ENTRADA registrada: ${pendingRecord.studentName} - ${pendingRecord.time}<br>`;
+            if (pendingRecord.punctualityStatus) {
+                statusMessage += `<strong>${punctualityIcon} ${pendingRecord.punctualityStatus}</strong><br>`;
+            }
+            statusMessage += `<strong>${uniformIcon} ${uniformText}</strong>`;
+            
+            showStatus(statusMessage, 'success');
+            
+            // Cerrar modal
+            hideUniformModal();
+        }
 
         // ========== FUNCIONES DEL LECTOR BLUETOOTH ==========
 
@@ -836,7 +1043,10 @@
                 if (currentMode === 'bluetooth' && e.target.id !== 'bluetoothInput') {
                     if (!e.target.matches('input, button, select, a')) {
                         setTimeout(() => {
-                            document.getElementById('bluetoothInput').focus();
+                            const modal = document.getElementById('uniformModal');
+                            if (!modal.classList.contains('active')) {
+                                document.getElementById('bluetoothInput').focus();
+                            }
                         }, 100);
                     }
                 }
@@ -1394,31 +1604,27 @@
                 date: todayDate,
                 time: now.toLocaleTimeString('es-MX'),
                 timestamp: now.getTime(),
-                punctualityStatus: punctualityStatus
+                punctualityStatus: punctualityStatus,
+                uniformComplete: null // Se establecerá en el modal
             };
             
-            attendanceRecords.push(record);
-            saveData();
-            
-            if (isCloudConnected) {
-                const cloudSuccess = await saveToCloud('saveRecord', {
-                    action: 'saveRecord',
-                    record: record
-                });
+            // Si es ENTRADA, mostrar modal de uniforme
+            if (recordType === 'entrada') {
+                showUniformModal(student, record);
+            } else {
+                // Si es SALIDA, registrar directamente
+                attendanceRecords.push(record);
+                saveData();
                 
-                if (cloudSuccess) {
-                    console.log('Registro guardado en la nube');
+                if (isCloudConnected) {
+                    await saveToCloud('saveRecord', {
+                        action: 'saveRecord',
+                        record: record
+                    });
                 }
+                
+                showStatus(`🔴 SALIDA registrada: ${student.name} - ${record.time}`, 'success');
             }
-            
-            const icon = recordType === 'entrada' ? '🟢' : '🔴';
-            let statusMessage = `${icon} ${recordType.toUpperCase()} registrada: ${student.name} - ${record.time}`;
-            
-            if (punctualityStatus) {
-                statusMessage += `<br><strong>${punctualityIcon} ${punctualityStatus}</strong>`;
-            }
-            
-            showStatus(statusMessage, 'success');
         }
 
         function showStatus(message, type) {
@@ -1658,6 +1864,7 @@
                         entrada: '',
                         salida: '',
                         punctualityStatus: '',
+                        uniformComplete: null,
                         timestamp: record.timestamp
                     };
                 }
@@ -1665,6 +1872,7 @@
                 if (record.type === 'entrada') {
                     groupedRecords[key].entrada = record.time;
                     groupedRecords[key].punctualityStatus = record.punctualityStatus || '';
+                    groupedRecords[key].uniformComplete = record.uniformComplete;
                 } else if (record.type === 'salida') {
                     groupedRecords[key].salida = record.time;
                 }
@@ -1680,6 +1888,7 @@
                             <th>Alumno</th>
                             <th>Hora de Entrada</th>
                             <th>Estado</th>
+                            <th>Uniforme</th>
                             <th>Hora de Salida</th>
                         </tr>
                     </thead>
@@ -1704,12 +1913,20 @@
                                 }
                             }
                             
+                            let uniformCell = '<span style="color: #999;">-</span>';
+                            if (record.uniformComplete === true) {
+                                uniformCell = '<span style="color: #28a745; font-weight: bold;">✅ SÍ</span>';
+                            } else if (record.uniformComplete === false) {
+                                uniformCell = '<span style="color: #dc3545; font-weight: bold;">❌ NO</span>';
+                            }
+                            
                             return `
                                 <tr style="${statusColor}">
                                     <td>${record.date}</td>
                                     <td><strong>${record.studentName}</strong></td>
                                     <td>${record.entrada || '<span style="color: #999;">-</span>'}</td>
                                     <td>${statusCell}</td>
+                                    <td>${uniformCell}</td>
                                     <td>${record.salida || '<span style="color: #999;">-</span>'}</td>
                                 </tr>
                             `;
@@ -1748,22 +1965,29 @@
                         date: record.date,
                         entrada: '',
                         salida: '',
-                        punctualityStatus: ''
+                        punctualityStatus: '',
+                        uniformComplete: ''
                     };
                 }
                 
                 if (record.type === 'entrada') {
                     groupedRecords[key].entrada = record.time;
                     groupedRecords[key].punctualityStatus = record.punctualityStatus || '';
+                    if (record.uniformComplete === true) {
+                        groupedRecords[key].uniformComplete = 'SÍ';
+                    } else if (record.uniformComplete === false) {
+                        groupedRecords[key].uniformComplete = 'NO';
+                    }
                 } else if (record.type === 'salida') {
                     groupedRecords[key].salida = record.time;
                 }
             });
             
-            let csv = 'Fecha,Alumno,Hora de Entrada,Estado,Hora de Salida\n';
+            let csv = 'Fecha,Alumno,Hora de Entrada,Estado,Uniforme Completo,Hora de Salida\n';
             Object.values(groupedRecords).forEach(record => {
                 const status = record.punctualityStatus || '';
-                csv += `${record.date},${record.studentName},${record.entrada},${status},${record.salida}\n`;
+                const uniform = record.uniformComplete || '';
+                csv += `${record.date},${record.studentName},${record.entrada},${status},${uniform},${record.salida}\n`;
             });
             
             const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -1871,6 +2095,8 @@
                 const puntuales = entradas.filter(r => r.punctualityStatus === 'PUNTUAL').length;
                 const retardos = entradas.filter(r => r.punctualityStatus === 'RETARDO').length;
                 const faltasImpuntualidad = entradas.filter(r => r.punctualityStatus === 'FALTA POR IMPUNTUALIDAD').length;
+                const conUniforme = entradas.filter(r => r.uniformComplete === true).length;
+                const sinUniforme = entradas.filter(r => r.uniformComplete === false).length;
                 
                 studentStats[student.code] = {
                     name: student.name,
@@ -1880,7 +2106,9 @@
                     totalRegistros: studentRecords.length,
                     puntuales: puntuales,
                     retardos: retardos,
-                    faltasImpuntualidad: faltasImpuntualidad
+                    faltasImpuntualidad: faltasImpuntualidad,
+                    conUniforme: conUniforme,
+                    sinUniforme: sinUniforme
                 };
             });
             
@@ -1899,6 +2127,8 @@
                             <th>Puntuales</th>
                             <th>Retardos</th>
                             <th>Faltas Impunt.</th>
+                            <th>Con Uniforme</th>
+                            <th>Sin Uniforme</th>
                             <th>% Asistencia</th>
                         </tr>
                     </thead>
@@ -1918,6 +2148,8 @@
                                     <td>✅ ${stats.puntuales}</td>
                                     <td>⚠️ ${stats.retardos}</td>
                                     <td>❌ ${stats.faltasImpuntualidad}</td>
+                                    <td>👔 ${stats.conUniforme}</td>
+                                    <td>⚠️ ${stats.sinUniforme}</td>
                                     <td><strong>${stats.porcentajeAsistencia}%</strong></td>
                                 </tr>
                             `;
@@ -1935,6 +2167,10 @@
                     <p>⚠️ <strong>RETARDO:</strong> Entrada entre 7:00 AM y 7:05 AM</p>
                     <p>❌ <strong>FALTA POR IMPUNTUALIDAD:</strong> Entrada después de las 7:05 AM</p>
                     <p>🕐 <strong>ENTRADA ANTICIPADA:</strong> Entrada antes de las 6:30 AM</p>
+                    <br>
+                    <h4>Control de Uniforme:</h4>
+                    <p>👔 <strong>Con Uniforme:</strong> Número de días que asistió con uniforme completo</p>
+                    <p>⚠️ <strong>Sin Uniforme:</strong> Número de días que asistió sin uniforme completo</p>
                 </div>
             `;
         }
